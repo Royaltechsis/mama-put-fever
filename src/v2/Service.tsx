@@ -385,7 +385,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
       ))}
       {/* hired help */}
       {(Object.keys(STAFF) as StaffId[]).filter((k) => save.staff?.[k]).map((k) => {
-        const idle = k === 'cook' ? -4 : k === 'waiter' ? 716 : 772;
+        const idle = k === 'cook' ? -4 : k === 'waiter' ? 678 : 762;
         const pos = G.staffPos[k];
         const working = !!pos && pos.until > t;
         return <StaffSprite key={k} id={k} x={working ? pos.x : idle} y={k === 'cook' ? 34 : working ? 52 : 26} act={working ? pos.act : ''} />;
@@ -779,53 +779,7 @@ function StaffSprite({ id, x, y, act }: { id: StaffId; x: number; y: number; act
   const st = useAnimatedStyle(() => ({ left: ax.value * (S(1)) }));
   return (
     <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: S(y), width: S(84), height: S(128), alignItems: 'center' }, st]}>
-      <Image source={SPR.cust[info.who]} style={{ width: S(84), height: S(112) }} resizeMode="contain" />
-      <Svg width={S(84)} height={S(128)} viewBox="0 0 84 128" style={{ position: 'absolute', top: 0, left: 0 }}>
-        {id === 'cook' && (
-          <>
-            {/* white chef jacket, double-breasted */}
-            <SPath d="M 6 114 L 8 64 Q 12 48 31 45 L 53 45 Q 72 48 76 64 L 78 114 Z" fill="#FFFFFF" stroke="#CFC8BA" strokeWidth={1.5} />
-            <SPath d="M 31 45 L 42 60 L 53 45" fill="none" stroke="#CFC8BA" strokeWidth={1.5} />
-            {[66, 78, 90, 102].map((cy) => (<React.Fragment key={cy}><SEllipse cx={35} cy={cy} rx={1.8} ry={1.8} fill="#9A8F7C" /><SEllipse cx={49} cy={cy} rx={1.8} ry={1.8} fill="#9A8F7C" /></React.Fragment>))}
-            {/* white chef cap */}
-            <SRect x={24} y={2} width={36} height={14} rx={3} fill="#FFFFFF" stroke="#CFC8BA" strokeWidth={1} />
-            <SEllipse cx={31} cy={0} rx={10} ry={8} fill="#FFFFFF" /><SEllipse cx={42} cy={-3} rx={11} ry={9} fill="#FFFFFF" /><SEllipse cx={53} cy={0} rx={10} ry={8} fill="#FFFFFF" />
-          </>
-        )}
-        {id === 'waiter' && (
-          <>
-            {/* dark shirt under the apron so no customer clothes show */}
-            <SPath d="M 6 114 L 8 64 Q 12 48 31 45 L 53 45 Q 72 48 76 64 L 78 114 Z" fill="#3A2416" />
-            {/* amber Mamaput apron */}
-            <SPath d="M 28 54 L 56 54 L 64 114 L 20 114 Z" fill="#F5A524" stroke="#C47D0E" strokeWidth={1.5} />
-            <SPath d="M 28 54 L 33 45 M 56 54 L 51 45" stroke="#F5A524" strokeWidth={3} />
-            <SText x={42} y={80} fontSize={8.5} fontWeight="900" fill="#3A2416" textAnchor="middle">Mamaput</SText>
-            <SRect x={30} y={88} width={24} height={10} rx={2} fill="#E08F12" />
-            {/* amber cap */}
-            <SPath d="M 25 15 Q 42 -6 59 15 Z" fill="#F5A524" stroke="#C47D0E" strokeWidth={1} />
-            <SRect x={52} y={12} width={16} height={4} rx={2} fill="#C47D0E" />
-            {/* tray held up */}
-            <SPath d="M 74 70 L 74 58" stroke="#3A2416" strokeWidth={4} strokeLinecap="round" />
-            <SEllipse cx={74} cy={56} rx={14} ry={4} fill="#C9CED6" stroke="#8D949E" strokeWidth={1} />
-            <SEllipse cx={74} cy={52} rx={7} ry={3} fill="#FFFFFF" />
-          </>
-        )}
-        {id === 'cleaner' && (
-          <>
-            {/* blue smock */}
-            <SPath d="M 6 114 L 8 64 Q 12 48 31 45 L 53 45 Q 72 48 76 64 L 78 114 Z" fill="#2F6FD6" stroke="#1E4E9E" strokeWidth={1.5} />
-            <SRect x={26} y={84} width={14} height={10} rx={2} fill="#2560C0" stroke="#1E4E9E" strokeWidth={1} />
-            <SPath d="M 31 45 L 42 56 L 53 45" fill="none" stroke="#FFFFFF" strokeWidth={2} />
-            {/* headscarf */}
-            <SPath d="M 22 20 Q 22 -2 42 -2 Q 62 -2 62 20 Q 52 12 42 12 Q 32 12 22 20 Z" fill="#1E4E9E" />
-            <SPath d="M 58 16 L 68 24 L 60 26 Z" fill="#1E4E9E" />
-            {[28, 38, 48].map((cx) => <SEllipse key={cx} cx={cx} cy={6} rx={2} ry={2} fill="#FFFFFF" opacity={0.8} />)}
-            {/* mop */}
-            <SPath d="M 76 30 L 72 118" stroke="#8B5A2B" strokeWidth={3.5} strokeLinecap="round" />
-            <SPath d="M 64 118 L 80 118 M 64 118 l -2 8 M 68 118 l -1 9 M 72 118 l 0 9 M 76 118 l 1 9 M 80 118 l 2 8" stroke="#E8E2D2" strokeWidth={3} strokeLinecap="round" />
-          </>
-        )}
-      </Svg>
+      <Image source={SPR.staff[id]} style={{ width: S(84), height: S(118) }} resizeMode="contain" />
       <View style={{ position: 'absolute', bottom: S(4), backgroundColor: info.color, borderRadius: S(6), paddingHorizontal: S(5) }}>
         <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(9) }}>{id === 'cook' ? 'Cook' : id === 'waiter' ? 'Waiter' : 'Cleaner'}</Text>
       </View>

@@ -44,12 +44,14 @@ export default function DaySummary({ day, idx, ankara, service, event, stars, to
                 <Row l={`Wages (${staffCount} staff)`} v={naira(-wages)} c="#D7263D" />
                 <Row l="Profit today" v={naira(profit)} c={profit >= 0 ? '#2FA544' : '#D7263D'} b />
               </View>
-              <View style={{ marginLeft: S(12), width: S(200), justifyContent: 'center' }}>
-                <GText size={14}>{`Served ${service.served}/${service.total}`}</GText>
-                {service.lost > 0 && <GText size={13} color="#FFB3A8">{`${service.lost} walked out`}</GText>}
-                {service.bestCombo >= 2 && <GText size={13} color="#BFF5B0">{`Best combo ×${service.bestCombo}`}</GText>}
-                <GText size={11} style={{ marginTop: S(6) }}>{`Stars at ${goals.map((g) => naira(g)).join(' / ')}`}</GText>
-                {(service.runner ?? 0) > 0 && <GText size={11} color="#FFE7B3">{`Errand boy restocks: ${service.runner}`}</GText>}
+              <View testID="sum-side" style={{ marginLeft: S(12), width: S(200), backgroundColor: '#FFF6E4', borderRadius: S(12), paddingVertical: S(10), paddingHorizontal: S(12), justifyContent: 'center', borderWidth: S(2), borderColor: '#E3C9A0' }}>
+                <Text style={{ color: '#3A2416', fontSize: S(18), fontWeight: '900' }}>{`Served ${service.served}/${service.total}`}</Text>
+                {service.lost > 0 && <Text style={{ color: '#B3261E', fontSize: S(15), fontWeight: '800', marginTop: S(3) }}>{`${service.lost} walked out`}</Text>}
+                {service.bestCombo >= 2 && <Text style={{ color: '#1E7A32', fontSize: S(15), fontWeight: '800', marginTop: S(3) }}>{`Best combo ×${service.bestCombo}`}</Text>}
+                <View style={{ height: S(1), backgroundColor: '#E3C9A0', marginVertical: S(6) }} />
+                <Text style={{ color: '#5E3A1A', fontSize: S(13), fontWeight: '800' }}>Stars at</Text>
+                <Text style={{ color: '#3A2416', fontSize: S(13), fontWeight: '900' }}>{goals.map((g) => naira(g)).join(' / ')}</Text>
+                {(service.runner ?? 0) > 0 && <Text style={{ color: '#5E3A1A', fontSize: S(13), fontWeight: '800', marginTop: S(4) }}>{`Errand boy restocks: ${service.runner}`}</Text>}
               </View>
             </View>
             <View style={{ flexDirection: 'row', marginTop: S(12), gap: S(8) }}>
@@ -58,7 +60,7 @@ export default function DaySummary({ day, idx, ankara, service, event, stars, to
               <GameBtn label="↻ Retry" color="orange" w={100} h={44} size={14} testID="end-retry" onPress={onRetry} />
               <GameBtn label={stars > 0 ? 'Next day ▶' : 'Try again ▶'} w={160} h={44} size={16} testID="end-next" onPress={stars > 0 ? onNext : onRetry} />
             </View>
-            <Text onPress={onHome} testID="end-home" style={{ color: '#FFE7B3', fontSize: S(11), marginTop: S(6), textDecorationLine: 'underline' }}>Back to the city</Text>
+            <Text onPress={onHome} testID="end-home" style={{ color: '#7A4A22', fontSize: S(13), fontWeight: '800', marginTop: S(8), textDecorationLine: 'underline' }}>Back to the city</Text>
           </View>
         </Panel>
       </Animated.View>

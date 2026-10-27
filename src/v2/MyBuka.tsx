@@ -95,7 +95,7 @@ export default function MyBuka({ save, onSave, onBack, onMarket }: { save: Save2
             const s = STAFF[k]; const hired = !!save.staff?.[k]; const locked = stars < s.stars;
             return (
               <Card key={k} title={`${s.name}`} desc={`${s.job}\nWage ${naira(s.wage)} a day`} testID={`card-staff-${k}`}
-                icon={<View style={{ alignItems: 'center' }}><Image source={SPR.cust[s.who]} style={{ width: S(56), height: S(70), opacity: locked ? 0.4 : 1 }} resizeMode="contain" /><View style={{ position: 'absolute', bottom: 0, backgroundColor: s.color, borderRadius: S(6), paddingHorizontal: S(4) }}><Text style={{ color: '#FFF', fontSize: S(9), fontWeight: '900' }}>{k.toUpperCase()}</Text></View></View>}>
+                icon={<View style={{ alignItems: 'center' }}><Image source={SPR.staff[k]} style={{ width: S(60), height: S(76), opacity: locked ? 0.4 : 1 }} resizeMode="contain" /><View style={{ position: 'absolute', bottom: 0, backgroundColor: s.color, borderRadius: S(6), paddingHorizontal: S(4) }}><Text style={{ color: '#FFF', fontSize: S(9), fontWeight: '900' }}>{k.toUpperCase()}</Text></View></View>}>
                 {locked ? <Text style={{ fontWeight: '900', color: '#A0522D', marginBottom: S(6) }}>{`🔒 Needs ${s.stars}⭐`}</Text>
                   : hired ? <GameBtn label="Let go" color="red" w={110} h={32} size={12} testID={`fire-${k}`} onPress={() => onSave({ ...save, staff: { ...(save.staff ?? {}), [k]: false } })} />
                   : <GameBtn label="Hire" w={110} h={34} size={14} testID={`hire-${k}`} onPress={() => { play('cash'); onSave({ ...save, staff: { ...(save.staff ?? {}), [k]: true } }); }} />}

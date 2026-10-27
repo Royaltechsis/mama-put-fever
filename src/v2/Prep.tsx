@@ -36,7 +36,7 @@ export default function Prep({ dest, canSkip, hasFry, onDone }: { dest: string; 
   const stageT0 = useRef(Date.now());
   const now = useNow(50);
   const t = (now - stageT0.current) / 1000;
-  const r = useRef({ chops: 0, vegDone: 0, lastChop: 0, knifeAt: 0, stir: 0, burn: 0, burns: 0, heat: 1, ang: 0, lastAng: null as null | number, stirSpeed: 0, lastMove: 0, slices: [] as { c: [number, number]; side: number; start: number; flipAt: number; out: boolean; q: number }[], fryDone: 0, fryScore: 0, res: { chop: 0, stir: 0, fry: 0 }, lastSizzle: 0, lastBubble: 0 });
+  const r = useRef({ chops: 0, vegDone: 0, lastChop: 0, knifeAt: 0, stir: 0, burn: 0, burns: 0, heat: 1, ang: 0, lastAng: null as null | number, stirSpeed: 0, lastMove: 0, slices: [] as { c: [number, number]; side: number; start: number; flipAt: number; out: boolean; q: number }[], fryDone: 0, fryScore: 0, res: { chop: 0, stir: 0, fry: 0 }, lastSizzle: 0, lastBubble: 0, cutAt: [] as number[], pile: [] as number[], doneAt: 0, doneVeg: -1 });
   const R = r.current;
   if (Platform.OS === 'web' && typeof window !== 'undefined') (window as any).__prep = { stage, card, R, t };
 
@@ -84,8 +84,9 @@ export default function Prep({ dest, canSkip, hasFry, onDone }: { dest: string; 
     if (stage !== 'chop' || card) return;
     const n = Date.now(); if (n - R.lastChop < 90) return;
     R.lastChop = n; R.knifeAt = n; R.chops++;
+    R.cutAt.push(n);
     synth('chop');
-    if (R.chops % 6 === 0) { R.vegDone++; play('plop'); }
+    if (R.chops % 6 === 0) { R.pile.push(R.vegDone % cfg.veg.length); R.doneVeg = R.vegDone % cfg.veg.length; R.doneAt = n; R.cutAt = []; R.vegDone++; play('plop'); }
   };
   const chopStartY = useRef(0);
   // ---- stir ----
@@ -213,15 +214,71 @@ function vegPath(kind: Veg['kind'], cx: number, cy: number, w: number) {
   const ry = kind === 'onion' ? h / 2 : h / 2.1;
   return `M ${cx - w / 2} ${cy} A ${w / 2} ${ry} 0 1 1 ${cx + w / 2} ${cy} A ${w / 2} ${ry} 0 1 1 ${cx - w / 2} ${cy} Z`;
 }
+// one cut piece lying on the board, drawn by veg type (local coords, ~30px)
+function Piece({ v, x, y, rot, s = 1, op = 1, sx = 1 }: { v: Veg; x: number; y: number; rot: number; s?: number; op?: number; sx?: number }) {
+  const T = `translate(${x} ${y}) rotate(${rot}) scale(${s * sx} ${s})`;
+  if (v.kind === 'round') {
+    // tomato wedge: skin rim on the outer arc, flesh, seed pockets
+    return (
+      <G transform={T} opacity={op}>
+        <Path d="M -16 6 L 20 -14 A 26 26 0 0 1 20 22 Z" fill="#00000022" transform="translate(2 3)" />
+        <Path d="M -16 6 L 20 -14 A 26 26 0 0 1 20 22 Z" fill={v.inside} stroke={v.skin} strokeWidth={4} strokeLinejoin="round" />
+        <Path d="M -10 6 L 16 -8 A 18 18 0 0 1 16 18 Z" fill="#F7836A" />
+        <Ellipse cx={10} cy={-1} rx={6} ry={4} fill="#FBB49A" /><Ellipse cx={11} cy={12} rx={6} ry={4} fill="#FBB49A" />
+        {[[8, -2], [12, 0], [9, 11], [13, 13], [5, 5]].map(([a, b], i) => <Ellipse key={i} cx={a} cy={b} rx={1.6} ry={1.1} fill={v.seed} />)}
+      </G>
+    );
+  }
+  if (v.kind === 'onion') {
+    // onion ring slice: concentric rings
+    return (
+      <G transform={T} opacity={op}>
+        <Ellipse cx={2} cy={3} rx={22} ry={20} fill="#00000022" />
+        <Ellipse cx={0} cy={0} rx={22} ry={20} fill={v.inside} stroke={v.skin} strokeWidth={3.5} />
+        {[16, 11, 6].map((r) => <Ellipse key={r} cx={0} cy={0} rx={r} ry={r * 0.9} fill="none" stroke={v.seed} strokeWidth={1.8} />)}
+        <Ellipse cx={0} cy={0} rx={2.5} ry={2.2} fill="#E9CFE3" />
+      </G>
+    );
+  }
+  if (v.kind === 'long') {
+    return (
+      <G transform={T} opacity={op}>
+        <Path d="M -20 0 Q 0 -10 20 0 Q 0 6 -20 0 Z" fill={v.skin} /><Path d="M -16 0 L 16 0" stroke={v.inside} strokeWidth={1.5} />
+      </G>
+    );
+  }
+  // pepper ring (tatashe / rodo): lobed skin, flesh, pale core with seeds
+  return (
+    <G transform={T} opacity={op}>
+      <Path d="M 0 -20 Q 12 -24 16 -12 Q 26 -4 18 8 Q 18 22 2 20 Q -12 24 -18 10 Q -26 -2 -16 -12 Q -12 -24 0 -20 Z" fill="#00000022" transform="translate(2 3)" />
+      <Path d="M 0 -20 Q 12 -24 16 -12 Q 26 -4 18 8 Q 18 22 2 20 Q -12 24 -18 10 Q -26 -2 -16 -12 Q -12 -24 0 -20 Z" fill={v.skin} />
+      <Path d="M 0 -14 Q 9 -17 11 -8 Q 18 -2 12 6 Q 12 15 1 14 Q -8 17 -12 7 Q -18 -1 -11 -8 Q -8 -17 0 -14 Z" fill="#7A1A12" opacity={0.35} />
+      <Ellipse cx={0} cy={0} rx={7} ry={6} fill={v.seed} opacity={0.9} />
+      {[[-3, -2], [2, -3], [3, 2], [-2, 3], [0, 0]].map(([a, b], i) => <Ellipse key={i} cx={a} cy={b} rx={1.6} ry={1.2} fill="#F2DDA0" stroke="#C9A85A" strokeWidth={0.4} />)}
+    </G>
+  );
+}
+const rnd = (i: number) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function ChopView({ cfg, R }: { cfg: Cfg; R: any }) {
   const S = useS();
+  const nowMs = Date.now();
   const veg = cfg.veg[R.vegDone % cfg.veg.length];
-  const cut = R.chops % 6; // strips separated so far
-  const cx = 405, cy = 238, w = 170, N = 6, x0 = cx - w / 2, sw = w / N;
-  const knifeDown = Date.now() - R.knifeAt < 110;
-  const kx = x0 + (N - cut - 1) * sw + sw; // next cut line
-  const bowl = Math.min(24, R.vegDone * 6 + (cut > 0 ? 0 : 0));
-  const done = cfg.veg.slice(0, R.vegDone);
+  const cut = R.chops % 6; // slices off so far
+  const cutAt: number[] = R.cutAt ?? [];
+  const pile: number[] = R.pile ?? [];
+  const cx = 400, cy = 236, w = 150, N = 6, x0 = cx - w / 2, sw = w / N;
+  // knife: fast chop down, lift back up
+  const kt = nowMs - R.knifeAt;
+  const kd = kt < 60 ? kt / 60 : kt < 180 ? 1 - (kt - 60) / 120 : 0;
+  const kx = x0 + (N - Math.max(cut, 0)) * sw - (kt < 180 ? 0 : 0);
+  // new veg rolls in after the last one is finished
+  const intro = R.doneAt ? Math.min(1, (nowMs - R.doneAt) / 260) : 1;
+  const vy = (1 - intro) * -60;
+  const bowl = Math.min(30, Math.max(0, pile.length - 2) * 6);
+  // fallen slice landing spot for slice j (0 = first cut, the rightmost strip)
+  const land = (j: number) => ({ x: 520 + (j % 3) * 30 + (j > 2 ? 14 : 0), y: 206 + Math.floor(j / 3) * 40 + (j % 2) * 6, rot: -30 + rnd(j + R.vegDone * 7) * 60 });
+  const doneVeg = R.doneVeg >= 0 ? cfg.veg[R.doneVeg] : null;
+  const doneT = R.doneAt ? (nowMs - R.doneAt) / 420 : 9;
   return (
     <Svg width={S(SW)} height={S(SH)} viewBox={`0 0 ${SW} ${SH}`} style={{ position: 'absolute' }} pointerEvents="none">
       <Defs>
@@ -234,24 +291,75 @@ function ChopView({ cfg, R }: { cfg: Cfg; R: any }) {
       <Rect x={190} y={135} width={440} height={210} rx={22} fill="#7A4A22" />
       <Rect x={186} y={128} width={440} height={210} rx={22} fill="url(#board)" />
       {[0, 1, 2, 3, 4, 5].map((i) => <Path key={i} d={`M ${200} ${150 + i * 32} Q ${400} ${140 + i * 32 + (i % 2 ? 10 : -8)} ${612} ${152 + i * 32}`} stroke="#A86E38" strokeWidth={2} fill="none" opacity={0.5} />)}
-      <Circle cx={600} cy={150} r={8} fill="#7A4A22" />
-      {/* veg strips */}
-      {Array.from({ length: N }).map((_, k) => {
-        const sep = k >= N - cut; const dx = sep ? (k - (N - cut) + 1) * 12 : 0;
-        return (
-          <G key={k} clipPath={`url(#strip${k})`} transform={`translate(${dx} 0)`}>
-            <Path d={vegPath(veg.kind, cx, cy, w)} fill={veg.skin} />
-            {!sep && <Ellipse cx={cx - w * 0.15} cy={cy - w * 0.2} rx={w * 0.14} ry={w * 0.07} fill={veg.skin2} opacity={0.7} />}
-            {sep && <Path d={vegPath(veg.kind, cx, cy, w * 0.86)} fill={veg.inside} />}
-            {sep && veg.kind === 'onion' && [0.7, 0.5, 0.3].map((q) => <Path key={q} d={vegPath('onion', cx, cy, w * q)} stroke={veg.seed} strokeWidth={3} fill="none" />)}
-            {sep && veg.kind !== 'onion' && [-30, -10, 10, 30].map((oy) => <Circle key={oy} cx={x0 + k * sw + sw / 2} cy={cy + oy} r={3.2} fill={veg.seed} />)}
-          </G>
-        );
+      {/* juice stains from cuts */}
+      {cutAt.map((_, j) => <Ellipse key={'st' + j} cx={x0 + (N - j - 1) * sw + sw + 4} cy={cy + 52 + (j % 2) * 4} rx={9} ry={3} fill={veg.inside} opacity={0.28} />)}
+      {/* pile of finished slices (left side of the board) */}
+      {pile.slice(-3).map((vi, p) => {
+        const pv = cfg.veg[vi];
+        return Array.from({ length: 6 }).map((_, j) => {
+          const id = (pile.length - Math.min(3, pile.length) + p) * 6 + j;
+          const isNew = p === Math.min(3, pile.length) - 1 && doneT < 1;
+          if (isNew) return null;
+          return <Piece key={'p' + id} v={pv} x={230 + (j % 3) * 18 + rnd(id) * 8} y={170 + p * 52 + Math.floor(j / 3) * 16 + rnd(id + 3) * 6} rot={rnd(id + 9) * 360} s={0.72} />;
+        });
       })}
-      {veg.kind === 'round' && cut < 6 && <Path d={`M ${cx - 8} ${cy - w * 0.4} l 8 -10 l 8 10 l 10 -4 l -8 10 z`} fill="#3F8A2E" />}
-      {veg.kind === 'pepper' && cut < 5 && <Path d={`M ${cx - w / 2 + 2} ${cy - 4} q -14 -6 -18 -20`} stroke="#3F8A2E" strokeWidth={6} fill="none" strokeLinecap="round" />}
+      {/* last finished veg: slices sweep from the landing spot to the pile */}
+      {doneVeg && doneT < 1 && Array.from({ length: 6 }).map((_, j) => {
+        const L = land(j); const p = Math.min(2, pile.length - 1); const id = (pile.length - 1) * 6 + j;
+        const tx = 230 + (j % 3) * 18 + rnd(id) * 8, ty = 170 + p * 52 + Math.floor(j / 3) * 16 + rnd(id + 3) * 6;
+        const e = doneT * doneT * (3 - 2 * doneT);
+        return <Piece key={'m' + j} v={doneVeg} x={L.x + (tx - L.x) * e} y={L.y + (ty - L.y) * e - Math.sin(e * Math.PI) * 30} rot={L.rot + e * 180} s={1 - 0.28 * e} />;
+      })}
+      {/* the veg: uncut part stays whole */}
+      <G transform={`translate(0 ${vy})`}>
+        {Array.from({ length: N }).map((_, k) => {
+          if (k >= N - cut) return null;
+          return (
+            <G key={k} clipPath={`url(#strip${k})`}>
+              <Path d={vegPath(veg.kind, cx, cy, w)} fill={veg.skin} />
+              <Ellipse cx={cx - w * 0.15} cy={cy - w * 0.2} rx={w * 0.14} ry={w * 0.07} fill={veg.skin2} opacity={0.7} />
+            </G>
+          );
+        })}
+        {/* fresh cut face on the remaining piece */}
+        {cut > 0 && cut < N && (
+          <G clipPath={`url(#strip${N - cut - 1})`}>
+            <Rect x={x0 + (N - cut) * sw - 5} y={cy - 80} width={5} height={160} fill={veg.inside} opacity={0.95} />
+          </G>
+        )}
+        {veg.kind === 'round' && cut < 5 && <Path d={`M ${cx - 8} ${cy - w * 0.4} l 8 -10 l 8 10 l 10 -4 l -8 10 z`} fill="#3F8A2E" />}
+        {veg.kind === 'pepper' && cut < 5 && <Path d={`M ${cx - w / 2 + 2} ${cy - 4} q -14 -6 -18 -20`} stroke="#3F8A2E" strokeWidth={6} fill="none" strokeLinecap="round" />}
+        {veg.kind === 'onion' && cut < 6 && <Path d={`M ${cx - 4} ${cy - w * 0.42} q 4 -14 10 -18`} stroke="#C9A06A" strokeWidth={4} fill="none" strokeLinecap="round" />}
+      </G>
+      {/* cut slices: tip over and slide onto the board */}
+      {cutAt.map((t0, j) => {
+        const k = N - 1 - j; // strip index
+        const a = Math.min(1, (nowMs - t0) / 280); const e = 1 - (1 - a) * (1 - a);
+        const sx0 = x0 + k * sw + sw / 2; const L = land(j);
+        const bounce = a < 1 ? 0 : 0;
+        if (a < 0.35) {
+          // still standing: strip sliding away from the knife
+          return (
+            <G key={'c' + j} clipPath={`url(#strip${k})`} transform={`translate(${e * 30} 0)`}>
+              <Path d={vegPath(veg.kind, cx, cy, w)} fill={veg.skin} />
+              <Rect x={x0 + k * sw} y={cy - 80} width={4} height={160} fill={veg.inside} />
+            </G>
+          );
+        }
+        return <Piece key={'c' + j} v={veg} x={sx0 + (L.x - sx0) * e} y={cy + (L.y - cy) * e - Math.sin(e * Math.PI) * 24 + bounce} rot={L.rot * e} sx={0.25 + 0.75 * e} />;
+      })}
+      {/* juice and seed bits flying from the latest cut */}
+      {cut > 0 && nowMs - R.knifeAt < 420 && Array.from({ length: 9 }).map((_, i) => {
+        const tt = (nowMs - R.knifeAt) / 1000; const id = R.chops * 13 + i;
+        const vx = (rnd(id) - 0.3) * 260, vy0 = -90 - rnd(id + 1) * 140;
+        const px = kx + vx * tt, py = cy - 10 + vy0 * tt + 520 * tt * tt;
+        const seed = i % 3 === 0;
+        return seed ? <Ellipse key={'j' + i} cx={px} cy={py} rx={2} ry={1.4} fill={veg.seed} opacity={1 - tt * 2} />
+          : <Circle key={'j' + i} cx={px} cy={py} r={2.6 - tt * 3} fill={veg.kind === 'onion' ? '#F6F0FA' : veg.inside} opacity={0.9 - tt * 2} />;
+      })}
       {/* knife */}
-      <G transform={`translate(${kx} ${knifeDown ? 70 : 0})`}>
+      <G transform={`translate(${kx} ${kd * 74}) rotate(${-10 + kd * 10} 0 30)`}>
+        {kd > 0.2 && <Path d={`M -14 120 L -14 ${120 - kd * 60}`} stroke="#FFFFFF" strokeWidth={3} opacity={0.5 * kd} strokeLinecap="round" />}
         <Polygon points={`-6,60 6,60 10,175 -2,190 -6,175`} fill="url(#blade)" stroke="#6E7882" strokeWidth={1.5} />
         <Rect x={-9} y={6} width={18} height={56} rx={6} fill="#4A2A16" />
         <Circle cx={0} cy={20} r={2.5} fill="#D9C08A" /><Circle cx={0} cy={44} r={2.5} fill="#D9C08A" />
@@ -261,8 +369,8 @@ function ChopView({ cfg, R }: { cfg: Cfg; R: any }) {
       <Path d="M 645 268 Q 720 360 795 268 Z" fill="url(#bowlg)" stroke="#8FA5B5" strokeWidth={2} />
       <Ellipse cx={720} cy={268} rx={75} ry={16} fill="#E9EFF3" stroke="#8FA5B5" strokeWidth={2} />
       {Array.from({ length: bowl }).map((_, i) => {
-        const v = done[Math.floor(i / 6)] ?? veg; const a = i * 2.4; const rr = 10 + (i % 6) * 9;
-        return <Rect key={i} x={720 + Math.cos(a) * rr * 0.9 - 6} y={266 + Math.sin(a) * rr * 0.22 - 4} width={12} height={8} rx={3} fill={i % 2 ? v.inside : v.skin} transform={`rotate(${(i * 37) % 90} ${720 + Math.cos(a) * rr * 0.9} ${266 + Math.sin(a) * rr * 0.22})`} />;
+        const v = cfg.veg[pile[Math.floor(i / 6)] ?? 0] ?? veg; const a = i * 2.4; const rr = 10 + (i % 6) * 9;
+        return <Piece key={'b' + i} v={v} x={720 + Math.cos(a) * rr * 0.9} y={264 + Math.sin(a) * rr * 0.2} rot={(i * 47) % 360} s={0.42} />;
       })}
     </Svg>
   );

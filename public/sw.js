@@ -1,5 +1,5 @@
 /* Mamaput service worker: offline play after the first visit. */
-const V = 'mamaput-v5-vercel';
+const V = 'mamaput-v51-vercel';
 const DAT = null;          // gzip game bundle (static copies) or null
 const PRE = [];          // art + audio on the asset sites
 const SHELL = ['/', '/manifest.json', '/favicon.ico', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png'].concat(DAT ? [DAT] : []);

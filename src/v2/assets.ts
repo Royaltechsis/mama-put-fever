@@ -43,6 +43,11 @@ export const SPR = {
     egusipot: require('../../assets/v2/egusipot.webp'),
     tray: require('../../assets/v2/tray.webp'),
   },
+  staff: {
+    cook: require('../../assets/v2/staff_cook.webp'),
+    waiter: require('../../assets/v2/staff_waiter.webp'),
+    cleaner: require('../../assets/v2/staff_cleaner.webp'),
+  } as Record<'cook' | 'waiter' | 'cleaner', any>,
   cust: [0, 1, 2, 3, 4, 5].map((i) => [
     require('../../assets/v2/c0.webp'), require('../../assets/v2/c1.webp'), require('../../assets/v2/c2.webp'),
     require('../../assets/v2/c3.webp'), require('../../assets/v2/c4.webp'), require('../../assets/v2/c5.webp'),
