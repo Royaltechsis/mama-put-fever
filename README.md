@@ -107,3 +107,12 @@ Players can create an account (username, email, password) at any time from the *
 Then redeploy. Until both are set, the account screen shows "Accounts are not set up on this server yet." and the game keeps working as a guest.
 
 Local test of the API without a database: `npm i --no-save pg-mem`, then run a harness that sets `globalThis.__mp_q` to a pg-mem query function (see `api/_lib.js`).
+
+## Install as an app (PWA)
+
+Mamaput is an installable Progressive Web App. It has `public/manifest.json` (fullscreen, landscape, normal and maskable icons), Apple home-screen meta tags, and a service worker (`public/sw.js`).
+
+After the first visit, the game shell, the game code and the art and audio are cached, so guest play works offline. Account sign-in and sync always need the network.
+
+- On Android/Chrome: menu → **Install app**.
+- On iPhone/Safari: Share → **Add to Home Screen**.
