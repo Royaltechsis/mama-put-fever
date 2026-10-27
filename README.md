@@ -23,6 +23,11 @@ npx expo start --web    # browser
 npx expo export -p web  # static web build in dist/
 ```
 
+## Deploy to Vercel
+1. On vercel.com: **Add New → Project → Import** `Royaltechsis/mama-put-fever`.
+2. Leave every setting as is. `vercel.json` already sets the build (`npx expo export -p web`), the output folder (`dist`) and the single-page rewrite.
+3. Click **Deploy**. Every push to `main` redeploys automatically.
+
 ## Get an installable Android APK (EAS)
 ```bash
 git clone https://github.com/Royaltechsis/mama-put-fever.git
