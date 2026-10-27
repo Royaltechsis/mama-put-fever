@@ -59,7 +59,7 @@ export default function OwambeEvent({ bulk, bigPot, onDone }: { bulk: BulkLevel;
 
   useEffect(() => {
     if (phase !== 'brief' && phase !== 'done' && phase !== 'ride' && tl <= 0 && !ended.current) {
-      ended.current = true; setPhase('done'); play('bad');
+      ended.current = true; setPhase('done'); play('fail');
       setTimeout(() => onDone({ naira: 0, quality: 0, accuracy: 0, onTime: false, note: 'Time ran out — the party chopped somewhere else 😢' }), 1500);
     }
   }, [now]);

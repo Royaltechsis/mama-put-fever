@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Mama Put Fever",
+    "name": "Mamaput",
     "slug": "mama-put-fever",
     "version": "2.0.0",
     "orientation": "landscape",
@@ -21,10 +21,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "Mama Put Fever",
-      "shortName": "Mama Put",
+      "name": "Mamaput",
+      "shortName": "Mamaput",
       "themeColor": "#0B6E4F",
-      "backgroundColor": "#074634"
+      "backgroundColor": "#074634",
+      "description": "Mamaput: run the busiest buka in Lagos. A Cooking Fever-style Nigerian food game."
     },
     "plugins": [
       "expo-audio",

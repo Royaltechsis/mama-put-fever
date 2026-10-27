@@ -84,7 +84,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       const order = [1, 2, 0, 3];
       const slot = order.find((s) => G.custs[s] === null)!;
       G.custs[slot] = { id: G.nextIdx, who: sc.who, items: sc.items.map((m) => ({ m, done: false })), arrived: t, patience: 1, state: 'waiting', coins: 0, tip: 0, leftAt: 0 };
-      play('pop');
+      play('customer');
     }
     // patience
     G.custs.forEach((c, i) => {
@@ -92,7 +92,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       c.patience = Math.max(0, 1 - (t - c.arrived) / (lv.patience * patienceMul));
       if (c.patience <= 0) {
         c.state = 'left'; c.leftAt = t; G.lost++; G.combo = 0;
-        play('bad'); haptic.bad(); say('A customer left angry! 😤');
+        play('angry'); haptic.bad(); say('A customer left angry! 😤');
         setTimeout(() => { if (G.custs[i] === c) { G.custs[i] = null; rerender(); } }, 900);
       }
     });
@@ -100,7 +100,8 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     if (G.pot.step === 99 && t - G.pot.cookStart >= 5) { G.pot = { portions: potCap, step: 0, cookStart: 0 }; play('ding'); }
     if (G.egusi.step === 99 && t - G.egusi.cookStart >= 5) { G.egusi = { portions: 4, step: 0, cookStart: 0 }; play('ding'); }
     // burn warnings
-    G.grill.forEach((s) => { if (s.item && t - s.start >= COOK[s.item] + BURN_AFTER && t - s.start < COOK[s.item] + BURN_AFTER + 0.12) play('sizzle'); });
+    G.grill.forEach((s) => { if (s.item && t - s.start >= COOK[s.item] + BURN_AFTER && t - s.start < COOK[s.item] + BURN_AFTER + 0.12) play('burnt'); });
+    G.fryer.forEach((s) => { if (!s.item) return; const e = (t - s.start) / fryFast; if (e >= COOK[s.item] + BURN_AFTER && e < COOK[s.item] + BURN_AFTER + 0.12 / fryFast) play('burnt'); });
     // end?
     const allDone = G.nextIdx >= script.length && G.custs.every((c) => c === null);
     if (t >= lv.duration || allDone) {
@@ -167,7 +168,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       G.bestCombo = Math.max(G.bestCombo, G.combo);
       const tip = Math.round((price * 0.25 * c.patience * tipMul + (G.combo >= 2 ? 50 * Math.min(G.combo, 5) : 0)) / 50) * 50;
       c.state = 'paid'; c.coins = price; c.tip = tip; c.leftAt = t; G.served++;
-      play('cash'); haptic.good();
+      play(G.combo >= 2 ? 'combo' : 'lick'); haptic.good();
       if (G.combo >= 2) say(`Combo x${G.combo}! 🔥`);
       // auto-collect after a while so the line keeps moving
       setTimeout(() => collect(ci, c.id), 6000);
@@ -179,7 +180,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     if (!c || c.state !== 'paid' || (id != null && c.id !== id)) return;
     G.coins += c.coins + c.tip;
     pop(SLOT_X[ci] + 10, 150, `+₦${(c.coins + c.tip).toLocaleString('en-US')}`);
-    play('ding');
+    play('cash');
     G.custs[ci] = null;
     rerender();
   }

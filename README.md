@@ -1,8 +1,8 @@
-# Mama Put Fever 🍲🇳🇬
+# Mamaput 🍲🇳🇬
 
 A **Cooking Fever-style** restaurant time-management game set in a Lagos *mama put* buka. Built with **Expo (SDK 58) + React Native + TypeScript**, played in **landscape**.
 
-▶ **Play in the browser:** https://mamaputfever.sites.tab.bot/ (turn your phone sideways)
+▶ **Play in the browser:** https://mamaput.sites.tab.bot/ (turn your phone sideways)
 
 ## How it plays
 - Customers queue at your counter (up to 4 at once), each with an order bubble and a draining patience bar.
@@ -13,7 +13,8 @@ A **Cooking Fever-style** restaurant time-management game set in a Lagos *mama p
 - **12 levels** with coin goals and **3 stars**. Fixed customer scripts, so you can practise and master each one.
 - **Owambe events** (levels 4, 8, 12): a bulk party order where you **cook for 15–30** (quantities scale with the guest count), **package** the right number of packs/coolers plus water, then pick a route for the **okada delivery**.
 - **Kitchen upgrades** (grill slots, pot portions, fryer speed and baskets, pour speed, extra plate) and **decor upgrades** (Ankara makeover, ceiling fans, Afrobeats speaker → more patience/tips). Coins, stars and upgrades are saved with AsyncStorage.
-- Real drag and drop (react-native-gesture-handler + reanimated), haptics on device, sound effects.
+- Real drag and drop (react-native-gesture-handler + reanimated), haptics on device.
+- **Naija sound**: an original Afrobeats/highlife theme loop (talking drum, shekere, highlife guitar) under the menu, a softer mix plus a low market ambience during service, and buka sound effects. Music and sounds have separate on/off toggles on the home screen.
 
 ## Run it
 ```bash
@@ -48,4 +49,28 @@ npx eas-cli build -p android --profile preview
 - `src/dnd.tsx`: drag-and-drop layer (ghost, drop zones, tap fallback).
 - `assets/v2/`: generated cartoon art (restaurant, appliances, food, customers) as webp sprites.
 
-Art is AI-generated for this project. Gameplay mechanics are inspired by Cooking Fever; no assets come from it.
+## Sounds
+
+All audio is original and generated for this project (no samples from existing songs). Files live in `assets/audio/` and are wired in `src/fx.ts`.
+
+| Cue | File | When it plays |
+|---|---|---|
+| Theme | `theme.mp3` | 58 s seamless Afrobeats/highlife loop, ~112 BPM. Loud on menus, soft during service |
+| Market ambience | `ambience.mp3` | Low Lagos market bed (chatter, pots, distant horns) during service |
+| Title flourish | `win.mp3` | Plays once when the title screen first starts the music |
+| Customer call | `customer_b.mp3` | "Customer! Come and chop!" when a customer arrives (at most every 7 s; a drum tap otherwise) |
+| Burnt | `burnt_a/b.mp3` | "Ehn-ehn! E don burn o!" / "Ah! E don burn!" when grill or fryer food burns |
+| Angry customer | (wood thud for now) | An "Abeg!" voice line is planned for when a customer walks out |
+| Talking-drum tap | `pop.mp3` | Serving one item |
+| Pot plop | `plop.mp3` | Ingredient into the pot, stirring |
+| Wood thud | `bad.mp3` | Wrong move |
+| Agogo bell | `ding.mp3` | Pot ready |
+| Sizzle | `sizzle.mp3` | Meat/plantain hits the grill or fryer |
+| Highlife lick | `lick.mp3` | Order complete |
+| Talking-drum roll | `combo.mp3` | Order complete during a combo |
+| Cha-ching + drum | `cash.mp3` | Collecting naira |
+| Okada horn | `horn.mp3` | Owambe delivery route |
+| Shekere + drum flourish | `win.mp3` | Level complete |
+| Sad sax | `fail.mp3` | Level failed |
+
+Art and audio are AI-generated for this project. Gameplay mechanics are inspired by Cooking Fever; no assets come from it.

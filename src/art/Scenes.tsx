@@ -234,7 +234,7 @@ export function Okada({ width = 200, loaded = 0 }: { width?: number; loaded?: nu
       {/* delivery box */}
       <Rect x={18} y={26} width={54} height={40} rx={4} fill="#0B6E4F" />
       <Rect x={18} y={26} width={54} height={8} rx={3} fill="#074634" />
-      <SvgText x={45} y={53} fontSize={8.5} fontWeight="bold" fill="#FFC93C" textAnchor="middle">MAMA PUT</SvgText>
+      <SvgText x={45} y={53} fontSize={8.5} fontWeight="bold" fill="#FFC93C" textAnchor="middle">MAMAPUT</SvgText>
       {loaded > 0 && <Rect x={22} y={60} width={46 * Math.min(1, loaded)} height={3} fill="#FFC93C" />}
       {/* rider */}
       <Path d="M96 60 L108 30 L124 30 L130 58 Z" fill="#F28C28" />
@@ -259,7 +259,7 @@ export function Stall({ width = 320 }: { width?: number }) {
       <Rect x={290} y={48} width={8} height={130} fill="#8B5A2B" />
       {/* sign */}
       <Rect x={90} y={56} width={140} height={30} rx={6} fill="#FFC93C" stroke="#5E3A1A" strokeWidth={3} />
-      <SvgText x={160} y={77} fontSize={16} fontWeight="bold" fill="#5E3A1A" textAnchor="middle">MAMA PUT</SvgText>
+      <SvgText x={160} y={77} fontSize={16} fontWeight="bold" fill="#5E3A1A" textAnchor="middle">MAMAPUT</SvgText>
       {/* mama */}
       <Path d="M130 178 Q132 120 160 118 Q188 120 190 178 Z" fill="#D7263D" />
       <Path d="M130 150 Q160 160 190 150" stroke="#FFC93C" strokeWidth={4} fill="none" />

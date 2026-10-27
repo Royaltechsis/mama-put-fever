@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { DragProvider } from './src/dnd';
-import { setSoundEnabled } from './src/fx';
+import { setMood, setMusicEnabled, setSoundEnabled } from './src/fx';
 import { Stage } from './src/v2/stage';
 import Home2 from './src/v2/Home2';
 import Service, { type ServiceResult } from './src/v2/Service';
@@ -23,7 +23,8 @@ type Phase =
 export default function App() {
   const [save, setSave] = useState<Save2 | null>(null);
   const [ph, setPh] = useState<Phase>({ p: 'home' });
-  useEffect(() => { loadSave2().then((s) => { setSave(s); setSoundEnabled(s.sound); }); }, []);
+  useEffect(() => { loadSave2().then((s) => { setSave(s); setSoundEnabled(s.sound); setMusicEnabled(s.music); }); }, []);
+  useEffect(() => { setMood(ph.p === 'service' || ph.p === 'event' ? 'game' : 'menu'); }, [ph.p]);
   const persist = (s: Save2) => { setSave(s); writeSave2(s); };
 
   function finishLevel(idx: number, service: ServiceResult, event: EventResult | null) {
@@ -54,6 +55,7 @@ export default function App() {
         onBuyKitchen={(k) => { const lvl = save.kitchen[k] ?? 0; const price = KITCHEN[k].prices[lvl]; if (price != null && save.coins >= price) persist({ ...save, coins: save.coins - price, kitchen: { ...save.kitchen, [k]: lvl + 1 } }); }}
         onBuyDecor={(d) => { const price = DECOR[d].price; if (!save.decor[d] && save.coins >= price) persist({ ...save, coins: save.coins - price, decor: { ...save.decor, [d]: true } }); }}
         onToggleSound={() => { setSoundEnabled(!save.sound); persist({ ...save, sound: !save.sound }); }}
+        onToggleMusic={() => { setMusicEnabled(!save.music); persist({ ...save, music: !save.music }); }}
         onReset={() => { if (Platform.OS !== 'web' || window.confirm('Reset all progress?')) persist({ ...DEFAULT_SAVE2 }); }} />
     );
   } else if (ph.p === 'intro') {

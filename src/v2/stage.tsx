@@ -28,7 +28,7 @@ function RotateHint() {
     <View style={{ flex: 1, backgroundColor: '#0B6E4F', alignItems: 'center', justifyContent: 'center', padding: 30 }}>
       <Text style={{ fontSize: 64 }}>📱↻</Text>
       <Text style={{ color: '#FFC93C', fontWeight: '900', fontSize: 24, marginTop: 12, textAlign: 'center' }}>Turn your phone sideways</Text>
-      <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 15, marginTop: 8, textAlign: 'center' }}>Mama Put Fever plays in landscape, like a real kitchen counter.</Text>
+      <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 15, marginTop: 8, textAlign: 'center' }}>Mamaput plays in landscape, like a real kitchen counter.</Text>
     </View>
   );
 }

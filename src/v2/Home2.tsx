@@ -12,8 +12,8 @@ const NODE = (i: number) => {
   return { x: 300 + col * 88, y: 92 + row * 120 + (col % 2) * 26 };
 };
 
-export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggleSound, onReset }: {
-  save: Save2; onPlay: (i: number) => void; onBuyKitchen: (k: KitchenUp) => void; onBuyDecor: (d: DecorUp) => void; onToggleSound: () => void; onReset: () => void;
+export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggleSound, onToggleMusic, onReset }: {
+  save: Save2; onPlay: (i: number) => void; onBuyKitchen: (k: KitchenUp) => void; onBuyDecor: (d: DecorUp) => void; onToggleSound: () => void; onToggleMusic: () => void; onReset: () => void;
 }) {
   const S = useS();
   const [shop, setShop] = useState<null | 'kitchen' | 'decor'>(null);
@@ -24,8 +24,7 @@ export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggle
       <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#1A0E0670' }} />
       {/* title */}
       <Abs x={14} y={14} w={270} h={200}>
-        <GText size={36} color="#FFC93C" stroke="#7E1020">Mama Put</GText>
-        <GText size={44} color="#FFFFFF" stroke="#D7263D" style={{ marginTop: S(-10) }}>FEVER</GText>
+        <GText size={50} color="#FFC93C" stroke="#7E1020">MAMAPUT</GText>
         <Text style={{ color: '#FFF', fontWeight: '800', fontSize: S(12), marginTop: S(4) }}>Run the busiest buka in Lagos 🇳🇬</Text>
         <View style={{ flexDirection: 'row', marginTop: S(8), alignItems: 'flex-end' }}>
           <Image source={SPR.cust[0]} style={{ width: S(70), height: S(86) }} resizeMode="contain" />
@@ -41,7 +40,10 @@ export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggle
           <View style={{ width: S(8) }} />
           <GameBtn label="🪴 Decor" testID="shop-decor" color="purple" w={116} h={42} size={14} onPress={() => setShop('decor')} />
         </View>
-        <Pressable onPress={onToggleSound} style={{ marginTop: S(6) }}><Text style={{ color: '#FFF', fontWeight: '800', fontSize: S(12) }}>{save.sound ? '🔊 Sound on' : '🔇 Sound off'}</Text></Pressable>
+        <View style={{ flexDirection: 'row', marginTop: S(6) }}>
+          <Pressable testID="toggle-music" onPress={onToggleMusic} style={{ marginRight: S(14) }}><Text style={{ color: '#FFF', fontWeight: '800', fontSize: S(12) }}>{save.music ? '🎵 Music on' : '🔇 Music off'}</Text></Pressable>
+          <Pressable testID="toggle-sfx" onPress={onToggleSound}><Text style={{ color: '#FFF', fontWeight: '800', fontSize: S(12) }}>{save.sound ? '🔊 Sounds on' : '🔇 Sounds off'}</Text></Pressable>
+        </View>
       </Abs>
       {/* top right coins */}
       <View style={{ position: 'absolute', right: S(10), top: S(10), flexDirection: 'row' }}>
@@ -53,7 +55,7 @@ export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggle
         </View>
       </View>
       {/* level map */}
-      <Abs x={290} y={48} w={548} h={20}><GText size={14}>Mama Put Buka · Lagos — 12 levels</GText></Abs>
+      <Abs x={290} y={48} w={548} h={20}><GText size={14}>Mamaput Buka · Lagos — 12 levels</GText></Abs>
       {LEVELS2.map((lv, i) => {
         const n = NODE(i);
         const locked = i > save.unlocked;

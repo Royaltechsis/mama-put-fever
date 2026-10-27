@@ -9,9 +9,10 @@ export type Save2 = {
   kitchen: Partial<Record<KitchenUp, number>>;
   decor: Partial<Record<DecorUp, boolean>>;
   sound: boolean;
+  music: boolean;
 };
 const KEY = 'mamaput.save.v2';
-export const DEFAULT_SAVE2: Save2 = { coins: 0, unlocked: 0, stars: [], best: [], kitchen: {}, decor: {}, sound: true };
+export const DEFAULT_SAVE2: Save2 = { coins: 0, unlocked: 0, stars: [], best: [], kitchen: {}, decor: {}, sound: true, music: true };
 export async function loadSave2(): Promise<Save2> {
   try {
     const raw = await AsyncStorage.getItem(KEY);

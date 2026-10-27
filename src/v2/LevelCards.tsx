@@ -63,8 +63,8 @@ export function LevelEnd({ idx, ankara, service, event, stars, total, onNext, on
 }) {
   const S = useS();
   const goals = goalsFor(idx);
-  useEffect(() => { play(stars > 0 ? 'cash' : 'bad'); }, []);
-  const quote = stars === 3 ? 'Chai! Mama Put, you be correct chef! 🔥' : stars === 2 ? 'Customers dey happy. Small more speed!' : stars === 1 ? 'We manage. Next time, sharp sharp!' : 'Na wa o! Customers waka comot…';
+  useEffect(() => { play(stars > 0 ? 'win' : 'fail'); }, []);
+  const quote = stars === 3 ? 'Chai! Mamaput, you be correct chef! 🔥' : stars === 2 ? 'Customers dey happy. Small more speed!' : stars === 1 ? 'We manage. Next time, sharp sharp!' : 'Na wa o! Customers waka comot…';
   return (
     <Backdrop ankara={ankara}>
       <Animated.View entering={ZoomIn}>
