@@ -58,9 +58,9 @@ All audio is original and generated for this project (no samples from existing s
 | Theme | `theme.mp3` | 58 s seamless Afrobeats/highlife loop, ~112 BPM. Loud on menus, soft during service |
 | Market ambience | `ambience.mp3` | Low Lagos market bed (chatter, pots, distant horns) during service |
 | Title flourish | `win.mp3` | Plays once when the title screen first starts the music |
-| Customer call | `customer_b.mp3` | "Customer! Come and chop!" when a customer arrives (at most every 7 s; a drum tap otherwise) |
-| Burnt | `burnt_a/b.mp3` | "Ehn-ehn! E don burn o!" / "Ah! E don burn!" when grill or fryer food burns |
-| Angry customer | (wood thud for now) | An "Abeg!" voice line is planned for when a customer walks out |
+| Customer arrives | `bell_a/b/c.mp3` + `f_*.mp3` / `m_*.mp3` | A quiet counter bell every time (never the same bell twice running). About 45% of arrivals also get one short voice matched to the customer: women say "Good afternoon o!", "Aunty, good afternoon!", "Ehen?", "Mmm!" or hum; men say "Aunty!", "How far?", "Ẹ kú àsán o!", a satisfied "Ahh", "Mm-hmm" or a grunt. Never the same voice twice in a row, at most one every 6.5 s |
+| Burnt | `burnt_a/b.mp3` | "Ehn-ehn! E don burn o!" / "Ah! E don burn!" when grill or fryer food burns (alternating, never the same twice in a row) |
+| Angry customer | `angry_a/b.mp3` | "Mtchew! Abeg, I no fit wait!" / "Abeg! Una too slow!" when a customer walks out (alternating; wood thud if two leave within 4 s) |
 | Talking-drum tap | `pop.mp3` | Serving one item |
 | Pot plop | `plop.mp3` | Ingredient into the pot, stirring |
 | Wood thud | `bad.mp3` | Wrong move |

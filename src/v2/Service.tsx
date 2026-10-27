@@ -9,6 +9,9 @@ import { SPR } from './assets';
 import { LEVELS2, MENU, scriptFor, stationsFor, goalsFor, type Comp, type Drink, type MenuId } from './data2';
 import type { Save2 } from './save2';
 
+// customer sprites c0, c3, c5 are women; c1, c2, c4 are men (matches the arrival voice)
+const FEMALE_CUSTS = [0, 3, 5];
+
 const COOK = { chicken: 5, suya: 5, dodo: 4, puffpuff: 4 } as const;
 const BURN_AFTER = 7;
 type GrillItem = 'chicken' | 'suya';
@@ -84,7 +87,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       const order = [1, 2, 0, 3];
       const slot = order.find((s) => G.custs[s] === null)!;
       G.custs[slot] = { id: G.nextIdx, who: sc.who, items: sc.items.map((m) => ({ m, done: false })), arrived: t, patience: 1, state: 'waiting', coins: 0, tip: 0, leftAt: 0 };
-      play('customer');
+      play('customer', { female: FEMALE_CUSTS.includes(sc.who) });
     }
     // patience
     G.custs.forEach((c, i) => {

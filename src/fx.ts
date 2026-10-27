@@ -16,25 +16,55 @@ const SOURCES = {
   lick: require('../assets/audio/lick.mp3'), // highlife guitar lick: order complete
   win: require('../assets/audio/win.mp3'), // shekere + drum flourish: level complete
   fail: require('../assets/audio/fail.mp3'), // sad sax sting: level failed
-  customer_b: require('../assets/audio/customer_b.mp3'), // "Customer! Come and chop!"
+  // customer arrival: a quiet counter bell every time, sometimes a short greeting / hum
+  bell_a: require('../assets/audio/bell_a.mp3'), // brass counter bell
+  bell_b: require('../assets/audio/bell_b.mp3'), // softer bell
+  bell_c: require('../assets/audio/bell_c.mp3'), // small bright ding
+  f_afternoon: require('../assets/audio/f_afternoon.mp3'), // "Good afternoon o!" (woman)
+  f_aunty: require('../assets/audio/f_aunty.mp3'), // "Aunty, good afternoon!" (woman)
+  f_ehen: require('../assets/audio/f_ehen.mp3'), // "Ehen?" (woman)
+  f_mmm: require('../assets/audio/f_mmm.mp3'), // appreciative "Mmm!" (woman)
+  f_hum: require('../assets/audio/f_hum.mp3'), // happy wordless hum (woman, SFX)
+  m_aunty: require('../assets/audio/m_aunty.mp3'), // "Aunty!" (man)
+  m_howfar: require('../assets/audio/m_howfar.mp3'), // "How far?" (man)
+  m_ekasan: require('../assets/audio/m_ekasan.mp3'), // "Ẹ kú àsán o!" (man)
+  m_ahh: require('../assets/audio/m_ahh.mp3'), // satisfied "Ahh" (man)
+  m_mmhm: require('../assets/audio/m_mmhm.mp3'), // "Mm-hmm" (man)
+  m_grunt: require('../assets/audio/m_grunt.mp3'), // wordless "mm-hm" grunt (man, SFX)
   burnt_a: require('../assets/audio/burnt_a.mp3'), // "Ehn-ehn! E don burn o!"
   burnt_b: require('../assets/audio/burnt_b.mp3'), // "Ah! E don burn!"
+  angry_a: require('../assets/audio/angry_a.mp3'), // "Mtchew! Abeg, I no fit wait!" (man)
+  angry_b: require('../assets/audio/angry_b.mp3'), // "Abeg! Una too slow!" (man)
 };
 type Src = keyof typeof SOURCES;
-// Voice cues pick a random take; they are rate-limited so the buka doesn't turn into a choir.
+// Voice cues pick a random take (never the same one twice in a row) and are rate-limited
+// so the buka doesn't turn into a choir.
 const VOICES = {
-  customer: ['customer_b'],
   burnt: ['burnt_a', 'burnt_b'],
-  angry: [], // "Abeg!" voice lines land in a follow-up; until then a customer walking out gets the thud
+  angry: ['angry_a', 'angry_b'],
 } as const satisfies Record<string, readonly Src[]>;
-export type Sfx = Exclude<Src, `${string}_a` | `${string}_b`> | keyof typeof VOICES;
+const BELLS: readonly Src[] = ['bell_a', 'bell_b', 'bell_c'];
+const GREET_F: readonly Src[] = ['f_afternoon', 'f_aunty', 'f_ehen', 'f_mmm', 'f_hum'];
+const GREET_M: readonly Src[] = ['m_aunty', 'm_howfar', 'm_ekasan', 'm_ahh', 'm_mmhm', 'm_grunt'];
+export type Sfx =
+  | Exclude<Src, `${string}_a` | `${string}_b` | `${string}_c` | `f_${string}` | `m_${string}`>
+  | keyof typeof VOICES
+  | 'customer';
 
-const VOL: Partial<Record<Src, number>> = { sizzle: 0.55, plop: 0.8, pop: 0.8, bad: 0.8, ding: 0.9 };
-const VOICE_GAP_MS: Record<keyof typeof VOICES, number> = { customer: 7000, burnt: 2500, angry: 2500 };
+const VOL: Partial<Record<Src, number>> = {
+  sizzle: 0.55, plop: 0.8, pop: 0.8, bad: 0.8, ding: 0.9,
+  bell_a: 0.4, bell_b: 0.45,
+  f_afternoon: 0.6, f_aunty: 0.6, f_ehen: 0.6, f_mmm: 0.6, f_hum: 0.6, m_aunty: 0.6, m_howfar: 0.6, m_ekasan: 0.6, m_ahh: 0.6, m_mmhm: 0.6, m_grunt: 0.6,
+  bell_c: 0.45, angry_a: 0.75, angry_b: 0.75,
+};
+const VOICE_GAP_MS: Record<keyof typeof VOICES, number> = { burnt: 2500, angry: 4000 };
+const GREET_GAP_MS = 6500; // at least this long between two customer voices
+const GREET_CHANCE = 0.45; // otherwise just the bell
 
 let enabled = true;
 const players: Partial<Record<Src, AudioPlayer>> = {};
 const lastVoice: Record<string, number> = {};
+const lastTake: Record<string, Src | undefined> = {};
 
 export function setSoundEnabled(v: boolean) {
   enabled = v;
@@ -53,20 +83,38 @@ function raw(name: Src) {
   } catch {}
 }
 
-export function play(name: Sfx) {
+// random take from a pool, never repeating the previous one for that pool
+function pick(pool: string, takes: readonly Src[]): Src | undefined {
+  if (!takes.length) return undefined;
+  const choices = takes.length > 1 ? takes.filter((t) => t !== lastTake[pool]) : takes;
+  const t = choices[Math.floor(Math.random() * choices.length)];
+  lastTake[pool] = t;
+  return t;
+}
+
+function customerArrives(female?: boolean) {
+  raw(pick('bell', BELLS)!);
+  const now = Date.now();
+  if (now - (lastVoice.greet ?? 0) < GREET_GAP_MS || Math.random() > GREET_CHANCE) return;
+  const pool = female === undefined ? [...GREET_F, ...GREET_M] : female ? GREET_F : GREET_M;
+  const v = pick('greet', pool.filter((t) => t !== lastTake.greetAny));
+  if (!v) return;
+  lastVoice.greet = now;
+  lastTake.greetAny = v;
+  setTimeout(() => { if (enabled) raw(v); }, 280);
+}
+
+export function play(name: Sfx, opts?: { female?: boolean }) {
   if (!enabled) return;
+  if (name === 'customer') { customerArrives(opts?.female); return; }
   if (name in VOICES) {
     const k = name as keyof typeof VOICES;
     const now = Date.now();
-    if (now - (lastVoice[k] ?? 0) < VOICE_GAP_MS[k]) {
-      if (k === 'customer') raw('pop');
-      else if (k === 'burnt') raw('bad');
-      return;
-    }
-    const takes: readonly Src[] = VOICES[k];
-    if (!takes.length) { raw('bad'); return; }
+    if (now - (lastVoice[k] ?? 0) < VOICE_GAP_MS[k]) { raw('bad'); return; }
+    const t = pick(k, VOICES[k]);
+    if (!t) { raw('bad'); return; }
     lastVoice[k] = now;
-    raw(takes[Math.floor(Math.random() * takes.length)]);
+    raw(t);
     return;
   }
   raw(name as Src);
