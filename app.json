@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Mama Put Fever",
+    "slug": "mama-put-fever",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.royaltechsis.mamaputfever"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B6E4F",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.royaltechsis.mamaputfever"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "Mama Put Fever",
+      "shortName": "Mama Put",
+      "themeColor": "#0B6E4F",
+      "backgroundColor": "#074634"
+    },
+    "plugins": [
+      "expo-audio"
+    ],
+    "backgroundColor": "#074634",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B6E4F"
+    }
+  }
+}
