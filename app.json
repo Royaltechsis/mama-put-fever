@@ -28,13 +28,9 @@
       "backgroundColor": "#074634"
     },
     "plugins": [
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
-    "backgroundColor": "#074634",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0B6E4F"
-    }
+    "backgroundColor": "#074634"
   }
 }
