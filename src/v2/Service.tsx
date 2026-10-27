@@ -7,7 +7,8 @@ import { useNow } from '../ui';
 import { Abs, GText, SW, useS } from './stage';
 import { SPR } from './assets';
 import { LEVELS2, MENU, scriptFor, stationsFor, goalsFor, type Comp, type Drink, type MenuId } from './data2';
-import type { Save2 } from './save2';
+import type { Save2, StockKey } from './save2';
+import { LBL, STOCK_INFO, STOCK_OF, RUNNER_MUL } from './dests';
 
 // customer sprites c0, c3, c5 are women; c1, c2, c4 are men (matches the arrival voice)
 const FEMALE_CUSTS = [0, 3, 5];
@@ -26,7 +27,7 @@ type Cust = {
 const SLOT_X = [96, 268, 440, 612];
 const PLATE_X = [300, 382, 464, 546];
 
-export type ServiceResult = { coins: number; served: number; lost: number; total: number; bestCombo: number };
+export type ServiceResult = { coins: number; served: number; lost: number; total: number; bestCombo: number; stock?: Record<StockKey, number>; runner?: number };
 
 export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: number; save: Save2; onEnd: (r: ServiceResult) => void; onQuit: () => void }) {
   const S = useS();
@@ -62,6 +63,8 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     shake: {} as Record<string, number>,
     ended: false,
     msg: null as null | { text: string; id: number },
+    stock: { ...save.stock } as Record<StockKey, number>,
+    runner: 0,
   });
   if (g.current.custs.length === 0) g.current.custs = [null, null, null, null];
   const G = g.current;
@@ -111,7 +114,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       G.ended = true;
       // auto-collect uncollected coins
       G.custs.forEach((c) => { if (c && c.state === 'paid') G.coins += c.coins + c.tip; });
-      setTimeout(() => onEnd({ coins: G.coins, served: G.served, lost: G.lost + G.custs.filter((c) => c && c.state === 'waiting').length + (script.length - G.nextIdx), total: script.length, bestCombo: G.bestCombo }), 900);
+      setTimeout(() => onEnd({ coins: G.coins, served: G.served, lost: G.lost + G.custs.filter((c) => c && c.state === 'waiting').length + (script.length - G.nextIdx), total: script.length, bestCombo: G.bestCombo, stock: { ...G.stock }, runner: G.runner }), 900);
     }
   }, [now]);
 
@@ -131,7 +134,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
   function addToPlate(pi: number, c: Comp): boolean {
     const p = G.plates[pi];
     if (p.includes(c)) { shake('plate' + pi); play('bad'); return false; }
-    if (c === 'yaji' && !p.includes('suya')) { say('Put suya on the plate first, then yaji'); shake('plate' + pi); play('bad'); return false; }
+    if (c === 'yaji' && !p.includes('suya')) { say(`Put ${LBL.suya.toLowerCase()} on the plate first, then ${LBL.yaji.toLowerCase()}`); shake('plate' + pi); play('bad'); return false; }
     // plates hold one dish: block mixing that can never match a menu item
     const next = [...p, c];
     const ok = (Object.keys(MENU) as MenuId[]).some((m) => MENU[m].comps && next.every((x) => MENU[m].comps!.includes(x)));
@@ -188,18 +191,35 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     rerender();
   }
 
+  // ---- market stock ----
+  const cnt = (src: string) => { const k = STOCK_OF[src]; return k ? G.stock[k] ?? 0 : undefined; };
+  function useStock(src: string): boolean {
+    const k = STOCK_OF[src];
+    if (!k) return true;
+    if ((G.stock[k] ?? 0) > 0) { G.stock[k]--; return true; }
+    // out of stock: the errand boy runs to market (double price, paid from today's takings)
+    const it = STOCK_INFO[k];
+    const cost = Math.round((it.price * RUNNER_MUL) / 2 / 100) * 100; // half a market pack at double price
+    G.stock[k] = Math.floor(it.pack / 2) - 1;
+    G.runner += cost; G.coins = Math.max(0, G.coins - cost);
+    say(`Out of ${it.name.toLowerCase()}! Errand boy bought more (−₦${cost.toLocaleString('en-US')})`);
+    pop(420, 250, `−₦${cost.toLocaleString('en-US')}`, '#FF8A7A');
+    return true;
+  }
   // ---- drops ----
   function onDropGrill(i: number, p: Payload) {
     if (p.kind !== 'src') return;
     const item: GrillItem | null = p.id === 'chicken_raw' ? 'chicken' : p.id === 'suya_raw' ? 'suya' : null;
     if (!item) return;
     if (G.grill[i].item) { shake('grill' + i); return; }
+    if (!useStock(p.id)) return;
     G.grill[i] = { item, start: t }; play('sizzle'); rerender();
   }
   function onDropFryer(i: number, p: Payload) {
     if (p.kind !== 'src') return;
     const item: FryItem | null = p.id === 'plantain' ? 'dodo' : p.id === 'batter' ? 'puffpuff' : null;
     if (!item || G.fryer[i].item) { shake('fry' + i); return; }
+    if (!useStock(p.id)) return;
     G.fryer[i] = { item, start: t }; play('sizzle'); rerender();
   }
   function potDrop(which: 'pot' | 'egusi', p: Payload) {
@@ -208,9 +228,10 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     const recipe = which === 'pot' ? ['blend', 'rice'] : ['blend', 'ugu'];
     if (P.portions > 0 || P.step === 99) { say(P.step === 99 ? 'It\'s cooking…' : 'Pot still has food. Serve it first'); shake(which); return; }
     if (p.id === recipe[P.step]) {
+      if (!useStock(p.id)) return;
       P.step++; play('plop');
       if (P.step >= recipe.length) { P.step = 99; P.cookStart = t; play('sizzle'); }
-    } else { say(`Recipe order: ${recipe.map((r) => r === 'blend' ? 'tomato-pepper' : r).join(' → ')}`); shake(which); play('bad'); }
+    } else { say(`Recipe order: ${recipe.map((r) => (LBL as any)[r] ?? r).join(' → ').toLowerCase()}`); shake(which); play('bad'); }
     rerender();
   }
   function onDropPlate(pi: number, p: Payload) {
@@ -267,7 +288,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     const ci = G.custs.findIndex((c) => c && c.state === 'waiting' && c.items.some((it) => !it.done && MENU[it.m].drink === s.item));
     if (ci >= 0) onDropCust(ci, { kind: 'cup', idx: k }); else { say('Nobody wants that drink yet'); }
   };
-  const pourDrink = (d: Drink) => { const k = G.cups.findIndex((s) => !s.item); if (k < 0) { say('Serve the cups first'); return; } G.cups[k] = { item: d, start: t }; play('plop'); rerender(); };
+  const pourDrink = (d: Drink) => { const k = G.cups.findIndex((s) => !s.item); if (k < 0) { say('Serve the cups first'); return; } if (!useStock('drinks')) return; G.cups[k] = { item: d, start: t }; play('plop'); rerender(); };
 
   // ---- render ----
   const tl = Math.max(0, lv.duration - t);
@@ -290,7 +311,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       )}
       {st.has('egusi') && (
         <PotStation x={134} y={182} w={104} label="egusi" portions={G.egusi.portions} cap={4} step={G.egusi.step} cookFrac={G.egusi.step === 99 ? (t - G.egusi.cookStart) / 5 : 0}
-          shakeN={G.shake.egusi ?? 0} onDrop={(p) => potDrop('egusi', p)} onTap={() => tapToPlate({ kind: 'pot', id: 'egusi' }, 'egusi')} sprite={SPR.appl.egusipot} heap={null} recipe={['blend', 'ugu']} />
+          shakeN={G.shake.egusi ?? 0} onDrop={(p) => potDrop('egusi', p)} onTap={() => tapToPlate({ kind: 'pot', id: 'egusi' }, 'egusi')} sprite={SPR.appl.egusipot} heap={LBL.egusi === 'egusi' ? null : SPR.food.egusi} recipe={['blend', 'ugu']} />
       )}
       {G.plates.map((pl, i) => (
         <Plate key={i} x={PLATE_X[i] - (plateN === 4 ? 30 : 0)} y={204} comps={pl} idx={i} shakeN={G.shake['plate' + i] ?? 0} onDrop={(p) => onDropPlate(i, p)} onTap={() => tapPlate(i)} />
@@ -317,17 +338,17 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
 
       {/* front row */}
       {st.has('pot') && <>
-        <Source id="blend" x={8} y={272} w={56} sprite={SPR.props.blend} label="Tomato-pepper" />
-        <Source id="rice" x={66} y={270} w={58} sprite={SPR.props.rice} label="Rice" />
+        <Source id="blend" x={8} y={272} w={56} sprite={SPR.props.blend} label={LBL.blend} count={cnt('blend')} />
+        <Source id="rice" x={66} y={270} w={58} sprite={SPR.props.rice} label={LBL.rice} count={cnt('rice')} />
       </>}
       {st.has('egusi') && <>
-        <Source id="ugu" x={136} y={276} w={48} sprite={SPR.props.ugu} label="Ugu" />
-        <Source id="eba" x={186} y={272} w={54} sprite={SPR.food.eba} label="Eba" tray onTap={() => tapToPlate({ kind: 'src', id: 'eba' }, 'eba')} />
+        <Source id="ugu" x={136} y={276} w={48} sprite={SPR.props.ugu} label={LBL.ugu} count={cnt('ugu')} />
+        <Source id="eba" x={186} y={272} w={54} sprite={SPR.food.eba} label={LBL.eba} tray onTap={() => tapToPlate({ kind: 'src', id: 'eba' }, 'eba')} />
       </>}
       {(st.has('grillChicken') || st.has('grillSuya')) && (
         <>
-          {st.has('grillChicken') && <Source id="chicken_raw" x={246} y={st.has('grillSuya') ? 258 : 278} w={st.has('grillSuya') ? 48 : 56} sprite={SPR.food.chicken_raw} label="Chicken" tray onTap={() => tapSrcGrill('chicken_raw')} />}
-          {st.has('grillSuya') && <Source id="suya_raw" x={246} y={st.has('grillChicken') ? 304 : 278} w={st.has('grillChicken') ? 48 : 56} sprite={SPR.food.suya_raw} label="Suya" tray onTap={() => tapSrcGrill('suya_raw')} />}
+          {st.has('grillChicken') && <Source id="chicken_raw" x={246} y={st.has('grillSuya') ? 258 : 278} w={st.has('grillSuya') ? 48 : 56} sprite={SPR.food.chicken_raw} label={LBL.chicken} count={cnt('chicken_raw')} tray onTap={() => tapSrcGrill('chicken_raw')} />}
+          {st.has('grillSuya') && <Source id="suya_raw" x={246} y={st.has('grillChicken') ? 304 : 278} w={st.has('grillChicken') ? 48 : 56} sprite={SPR.food.suya_raw} label={LBL.suya} count={cnt('suya_raw')} tray onTap={() => tapSrcGrill('suya_raw')} />}
           <Abs x={304} y={252} w={168} h={102}>
             <Image source={SPR.appl.grill} style={{ position: 'absolute', width: S(168), height: S(102) }} resizeMode="stretch" />
           </Abs>
@@ -354,8 +375,8 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       )}
       {(st.has('fryerDodo') || st.has('fryerPuff')) && (
         <>
-          {st.has('fryerDodo') && <Source id="plantain" x={496} y={st.has('fryerPuff') ? 258 : 278} w={st.has('fryerPuff') ? 46 : 52} sprite={SPR.food.plantain} label="Plantain" onTap={() => tapSrcFry('plantain')} />}
-          {st.has('fryerPuff') && <Source id="batter" x={496} y={st.has('fryerDodo') ? 304 : 278} w={st.has('fryerDodo') ? 46 : 52} sprite={SPR.props.batter} label="Batter" onTap={() => tapSrcFry('batter')} />}
+          {st.has('fryerDodo') && <Source id="plantain" x={496} y={st.has('fryerPuff') ? 258 : 278} w={st.has('fryerPuff') ? 46 : 52} sprite={SPR.food.plantain} label={LBL.plantain} count={cnt('plantain')} onTap={() => tapSrcFry('plantain')} />}
+          {st.has('fryerPuff') && <Source id="batter" x={496} y={st.has('fryerDodo') ? 304 : 278} w={st.has('fryerDodo') ? 46 : 52} sprite={SPR.props.batter} label={LBL.batter} count={cnt('batter')} onTap={() => tapSrcFry('batter')} />}
           <Abs x={556} y={250} w={124} h={104}>
             <Image source={SPR.appl.fryer} style={{ position: 'absolute', width: S(124), height: S(104) }} resizeMode="stretch" />
           </Abs>
@@ -378,7 +399,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
           })}
         </>
       )}
-      {st.has('grillSuya') && <Source id="yaji" x={722} y={300} w={50} sprite={SPR.props.yaji} label="Yaji" onTap={() => tapToPlate({ kind: 'src', id: 'yaji' }, 'yaji')} />}
+      {st.has('grillSuya') && <Source id="yaji" x={722} y={300} w={50} sprite={SPR.props.yaji} label={LBL.yaji} onTap={() => tapToPlate({ kind: 'src', id: 'yaji' }, 'yaji')} />}
       <Abs x={782} y={286} w={58} h={70}>
         <DropZone id="bin" testID="bin" accepts={(p) => p.kind !== 'src' && p.kind !== 'pot'} onDrop={onDropBin} style={{ flex: 1, borderRadius: S(12), borderWidth: S(2), borderColor: 'transparent' }} hoverStyle={{ borderColor: '#FF8A7A' }}>
           <Image source={SPR.props.bin} style={{ width: S(54), height: S(66) }} resizeMode="contain" />
@@ -424,7 +445,7 @@ function Cooking({ stt, children }: { stt: string; children: React.ReactNode }) 
   return <Animated.View style={a}>{children}</Animated.View>;
 }
 
-function Source({ id, x, y, w, sprite, label, tray, onTap }: { id: string; x: number; y: number; w: number; sprite: any; label: string; tray?: boolean; onTap?: () => void }) {
+function Source({ id, x, y, w, sprite, label, tray, onTap, count }: { id: string; x: number; y: number; w: number; sprite: any; label: string; tray?: boolean; onTap?: () => void; count?: number }) {
   const S = useS();
   return (
     <Abs x={x} y={y} w={w} h={w + 6}>
@@ -434,6 +455,7 @@ function Source({ id, x, y, w, sprite, label, tray, onTap }: { id: string; x: nu
         <View style={{ backgroundColor: '#2B1B12B0', borderRadius: S(6), paddingHorizontal: S(4), marginTop: S(-6) }}>
           <Text style={{ color: '#FFF', fontSize: S(8.5), fontWeight: '800' }} numberOfLines={1}>{label}</Text>
         </View>
+        {count != null && <View pointerEvents="none" style={{ position: 'absolute', right: S(-4), top: S(-4), minWidth: S(18), height: S(16), borderRadius: S(8), backgroundColor: count <= 5 ? '#D7263D' : '#2B1B12D0', borderWidth: S(1), borderColor: '#FFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: S(3) }}><Text style={{ color: '#FFF', fontSize: S(8.5), fontWeight: '900' }}>{count}</Text></View>}
       </Draggable>
     </Abs>
   );
@@ -460,7 +482,7 @@ function PotStation({ x, y, w, portions, cap, step, cookFrac, shakeN, onDrop, on
         {empty && step !== 99 && (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: S(-2), alignItems: 'center' }}>
             <View style={{ backgroundColor: '#FFC93C', borderRadius: S(8), paddingHorizontal: S(5), borderWidth: S(1.5), borderColor: '#A8520E' }}>
-              <Text style={{ fontSize: S(9), fontWeight: '900', color: '#2B1B12' }}>Add {recipe[step] === 'blend' ? 'tomato-pepper' : recipe[step]} {step + 1}/{recipe.length}</Text>
+              <Text style={{ fontSize: S(9), fontWeight: '900', color: '#2B1B12' }}>Add {((LBL as any)[recipe[step]] ?? recipe[step]).toLowerCase()} {step + 1}/{recipe.length}</Text>
             </View>
           </View>
         )}

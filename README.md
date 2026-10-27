@@ -1,10 +1,13 @@
 # Mamaput 🍲🇳🇬
 
-A **Cooking Fever-style** restaurant time-management game set in a Lagos *mama put* buka. Built with **Expo (SDK 58) + React Native + TypeScript**, played in **landscape**.
+A **Cooking Fever-style** restaurant time-management game that travels across Nigeria: start in a Lagos *mama put* buka, then unlock new cities with stars. Built with **Expo (SDK 58) + React Native + TypeScript**, played in **landscape**.
 
 ▶ **Play in the browser:** https://mamaput.sites.tab.bot/ (turn your phone sideways)
 
 ## How it plays
+- **World map of Nigeria**: Lagos (jollof, chicken, suya, dodo), **Ibadan** (amala + ewedu + gbegiri, asun, fried beef; 8 levels, unlocks at 5⭐) and **Port Harcourt** (bole & fish with pepper sauce, catfish pepper soup, starch + banga, palm wine; 8 levels, unlocks at 12⭐). Enugu, Kano and Abuja are on the map as *coming soon*.
+- **Oja (market)**: stalls for pepper & tomato, rice/beans/flour, meat & fish, plantain/yam/greens and drinks. Every pot, grill item and drink uses stock; restock with ₦ (if you run out mid-shift the errand boy buys more at double price). Kitchen gear and decor are sold here too.
+- Saves migrate automatically from `mamaput.save.v2` to `mamaput.save.v3` (Lagos progress kept).
 - Customers queue at your counter (up to 4 at once), each with an order bubble and a draining patience bar.
 - Cook on real stations: **jollof pot** (refill it by dragging in tomato-pepper → rice), **suya grill** (chicken / beef suya), **deep fryer** (dodo / puff-puff), **drink machine** (zobo / chapman), **egusi pot + eba**.
 - Grill and fryer items go **raw → ready → burnt**. Drag burnt food to the bin.

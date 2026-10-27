@@ -2,9 +2,11 @@ import type { Level as BulkLevel } from '../data';
 
 export type Comp = 'jollof' | 'chicken' | 'egusi' | 'eba' | 'suya' | 'yaji' | 'dodo' | 'puffpuff';
 export type Drink = 'zobo' | 'chapman';
-export type MenuId = 'jc' | 'jcd' | 'ee' | 'suya' | 'dodo' | 'puff' | 'zobo' | 'chapman';
+export type MenuId = string; // ids are per destination (Lagos: jc, jcd, ee, suya, dodo, puff, zobo, chapman)
+export type MenuItem = { name: string; comps?: Comp[]; drink?: Drink; price: number };
 
-export const MENU: Record<MenuId, { name: string; comps?: Comp[]; drink?: Drink; price: number }> = {
+// Mutable: swapped to the active destination's menu by activateDest() in dests.ts
+export const MENU: Record<MenuId, MenuItem> = {
   jc: { name: 'Jollof + chicken', comps: ['jollof', 'chicken'], price: 1200 },
   jcd: { name: 'Jollof, chicken + dodo', comps: ['jollof', 'chicken', 'dodo'], price: 1600 },
   ee: { name: 'Eba + egusi', comps: ['eba', 'egusi'], price: 1300 },
@@ -33,6 +35,7 @@ const bulk = (title: string, dish: 'jollof' | 'suya' | 'egusi' | 'dodo', people:
   title, tag: 'Owambe order', time, orders: [{ dish, people, container, sides, customer }],
 });
 
+// Mutable: swapped to the active destination's levels by activateDest()
 export const LEVELS2: Level2[] = [
   { name: 'Opening day', duration: 100, customers: 5, menu: ['jc'], maxItems: 1, gap: 11, patience: 45, isNew: 'Jollof pot + grill' },
   { name: 'Thirsty Tuesday', duration: 100, customers: 6, menu: ['jc', 'zobo'], maxItems: 2, gap: 10, patience: 42, isNew: 'Zobo from the drink machine' },

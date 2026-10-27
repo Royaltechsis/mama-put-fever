@@ -8,6 +8,8 @@ import { PlateView } from './Service';
 import type { ServiceResult } from './Service';
 import type { EventResult } from './OwambeEvent';
 import { play } from '../fx';
+import { LBL, STOCK_INFO, STOCK_OF } from './dests';
+import type { StockKey } from './save2';
 
 const naira = (n: number) => `₦${n.toLocaleString('en-US')}`;
 
@@ -21,9 +23,11 @@ function Backdrop({ ankara, children }: { ankara: boolean; children: React.React
   );
 }
 
-export function LevelIntro({ idx, ankara, onStart, onBack }: { idx: number; ankara: boolean; onStart: () => void; onBack: () => void }) {
+export function LevelIntro({ idx, ankara, stock, onStart, onBack, onMarket }: { idx: number; ankara: boolean; stock?: Record<StockKey, number>; onStart: () => void; onBack: () => void; onMarket?: () => void }) {
   const S = useS();
   const lv = LEVELS2[idx];
+  const need = Array.from(new Set(Object.values(STOCK_OF))) as StockKey[];
+  const low = stock ? need.filter((k) => (stock[k] ?? 0) < 12) : [];
   const goals = goalsFor(idx);
   return (
     <Backdrop ankara={ankara}>
@@ -46,9 +50,21 @@ export function LevelIntro({ idx, ankara, onStart, onBack }: { idx: number; anka
               {lv.customers} customers · {lv.duration}s{lv.bulk ? ' · then an Owambe bulk order 🎉' : ''}
             </Text>
             <Text style={{ fontWeight: '900', color: '#2B1B12', fontSize: S(13), marginTop: S(2) }}>⭐ {naira(goals[0])}   ⭐⭐ {naira(goals[1])}   ⭐⭐⭐ {naira(goals[2])}</Text>
-            {idx === 0 && <Text style={{ fontSize: S(11), fontWeight: '700', color: '#7B4BC4', marginTop: S(4), textAlign: 'center' }}>Drag raw chicken onto the grill · drag jollof from the pot onto a plate · add the grilled chicken · drag the plate to the customer. Tapping works too!</Text>}
+            {idx === 0 && <Text style={{ fontSize: S(11), fontWeight: '700', color: '#7B4BC4', marginTop: S(4), textAlign: 'center' }}>{LBL.jollof === 'jollof' ? 'Drag raw chicken onto the grill · drag jollof from the pot onto a plate · add the grilled chicken · drag the plate to the customer. Tapping works too!' : `Cook the ${LBL.jollof}: add ${LBL.blend.toLowerCase()} then ${LBL.rice.toLowerCase()} to the pot · drag it onto a plate · add the rest · drag the plate to the customer. Tapping works too!`}</Text>}
+            {stock && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: S(6), gap: S(6) }}>
+                {need.map((k) => (
+                  <View key={k} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: (stock[k] ?? 0) < 12 ? '#FFD6D6' : '#FFFFFFAA', borderRadius: S(8), paddingHorizontal: S(4) }}>
+                    <Image source={STOCK_INFO[k].icon} style={{ width: S(22), height: S(18) }} resizeMode="contain" />
+                    <Text style={{ fontSize: S(10), fontWeight: '900', color: (stock[k] ?? 0) < 12 ? '#B00020' : '#2B1B12' }}>{stock[k] ?? 0}</Text>
+                  </View>
+                ))}
+                {low.length > 0 && <Text style={{ fontSize: S(10), fontWeight: '900', color: '#B00020' }}>Low stock! Restock at the market (or the errand boy buys at 2x)</Text>}
+              </View>
+            )}
             <View style={{ flexDirection: 'row', marginTop: S(10), gap: S(12) }}>
-              <GameBtn label="Map" color="grey" w={110} h={44} onPress={onBack} />
+              <GameBtn label="Back" color="grey" w={100} h={44} onPress={onBack} />
+              {onMarket && <GameBtn label="🧺 Market" testID="intro-market" color="blue" w={130} h={44} size={15} onPress={onMarket} />}
               <GameBtn label="Start! ▶" testID="start" w={180} h={44} onPress={onStart} />
             </View>
           </View>

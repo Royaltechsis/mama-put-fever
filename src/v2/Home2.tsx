@@ -5,6 +5,7 @@ import { Abs, GText, GameBtn, Panel, SW, useS } from './stage';
 import { SPR } from './assets';
 import { DECOR, KITCHEN, LEVELS2, goalsFor, type DecorUp, type KitchenUp } from './data2';
 import type { Save2 } from './save2';
+import type { Dest } from './dests';
 
 const NODE = (i: number) => {
   const row = Math.floor(i / 6);
@@ -12,8 +13,8 @@ const NODE = (i: number) => {
   return { x: 300 + col * 88, y: 92 + row * 120 + (col % 2) * 26 };
 };
 
-export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggleSound, onToggleMusic, onReset }: {
-  save: Save2; onPlay: (i: number) => void; onBuyKitchen: (k: KitchenUp) => void; onBuyDecor: (d: DecorUp) => void; onToggleSound: () => void; onToggleMusic: () => void; onReset: () => void;
+export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuyKitchen, onBuyDecor, onToggleSound, onToggleMusic, onReset }: {
+  save: Save2; dest: Dest; onPlay: (i: number) => void; onMap: () => void; onMarket: () => void; onBuyKitchen: (k: KitchenUp) => void; onBuyDecor: (d: DecorUp) => void; onToggleSound: () => void; onToggleMusic: () => void; onReset: () => void;
 }) {
   const S = useS();
   const [shop, setShop] = useState<null | 'kitchen' | 'decor'>(null);
@@ -25,7 +26,8 @@ export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggle
       {/* title */}
       <Abs x={14} y={14} w={270} h={200}>
         <GText size={50} color="#FFC93C" stroke="#7E1020">MAMAPUT</GText>
-        <Text style={{ color: '#FFF', fontWeight: '800', fontSize: S(12), marginTop: S(4) }}>Run the busiest buka in Lagos 🇳🇬</Text>
+        <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(14), marginTop: S(2) }}>{dest.place}</Text>
+        <Text style={{ color: '#FFE7B0', fontWeight: '800', fontSize: S(11), marginTop: S(1) }}>{dest.name}, {dest.state} 🇳🇬 · {dest.tagline}</Text>
         <View style={{ flexDirection: 'row', marginTop: S(8), alignItems: 'flex-end' }}>
           <Image source={SPR.cust[0]} style={{ width: S(70), height: S(86) }} resizeMode="contain" />
           <Image source={SPR.food.jollof} style={{ width: S(60), height: S(50) }} resizeMode="contain" />
@@ -36,9 +38,9 @@ export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggle
       <Abs x={14} y={224} w={270} h={160}>
         <GameBtn label="▶ PLAY" testID="play" w={240} h={54} size={24} onPress={() => onPlay(Math.min(save.unlocked, LEVELS2.length - 1))} />
         <View style={{ flexDirection: 'row', marginTop: S(8) }}>
-          <GameBtn label="🔧 Kitchen" testID="shop-kitchen" color="blue" w={116} h={42} size={14} onPress={() => setShop('kitchen')} />
+          <GameBtn label="🗺 Map" testID="to-map" color="purple" w={116} h={42} size={14} onPress={onMap} />
           <View style={{ width: S(8) }} />
-          <GameBtn label="🪴 Decor" testID="shop-decor" color="purple" w={116} h={42} size={14} onPress={() => setShop('decor')} />
+          <GameBtn label="🧺 Market" testID="to-market" color="blue" w={116} h={42} size={14} onPress={onMarket} />
         </View>
         <View style={{ flexDirection: 'row', marginTop: S(6) }}>
           <Pressable testID="toggle-music" onPress={onToggleMusic} style={{ marginRight: S(14) }}><Text style={{ color: '#FFF', fontWeight: '800', fontSize: S(12) }}>{save.music ? '🎵 Music on' : '🔇 Music off'}</Text></Pressable>
@@ -55,7 +57,7 @@ export default function Home2({ save, onPlay, onBuyKitchen, onBuyDecor, onToggle
         </View>
       </View>
       {/* level map */}
-      <Abs x={290} y={48} w={548} h={20}><GText size={14}>Mamaput Buka · Lagos — 12 levels</GText></Abs>
+      <Abs x={290} y={48} w={548} h={20}><GText size={14}>{`${dest.name} — ${LEVELS2.length} levels · ⭐ unlock new cities`}</GText></Abs>
       {LEVELS2.map((lv, i) => {
         const n = NODE(i);
         const locked = i > save.unlocked;
