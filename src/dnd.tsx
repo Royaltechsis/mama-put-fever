@@ -8,7 +8,13 @@ export type Payload =
   | { kind: 'ing'; id: string }
   | { kind: 'station'; idx: number }
   | { kind: 'pkg'; id: string }
-  | { kind: 'parcel'; idx: number };
+  | { kind: 'parcel'; idx: number }
+  | { kind: 'src'; id: string }
+  | { kind: 'grill'; idx: number }
+  | { kind: 'fryer'; idx: number }
+  | { kind: 'pot'; id: string }
+  | { kind: 'plate'; idx: number }
+  | { kind: 'cup'; idx: number };
 
 type ViewRef = React.ComponentRef<typeof View>;
 type Rect = { x: number; y: number; w: number; h: number };
@@ -158,26 +164,31 @@ export function DragProvider({ children, style }: { children: React.ReactNode; s
   );
 }
 
-export function Draggable({ payload, ghost, children, enabled = true, style, testID }: {
+export function Draggable({ payload, ghost, children, enabled = true, style, testID, onTap }: {
   payload: Payload;
   ghost?: React.ReactNode;
   children: React.ReactNode;
   enabled?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  onTap?: () => void;
 }) {
   const ctx = useDrag();
   const ref = useRef<ViewRef>(null);
   const calib = useRef({ dx: 0, dy: 0 });
-  const latest = useRef({ payload, ghost, children, ctx });
-  latest.current = { payload, ghost, children, ctx };
+  const latest = useRef({ payload, ghost, children, ctx, onTap, enabled });
+  latest.current = { payload, ghost, children, ctx, onTap, enabled };
   const active = useRef(false);
+  const began = useRef(0);
+  const dragged = useRef(false);
 
   const pan = usePanGesture({
     runOnJS: true,
-    enabled,
+    enabled: enabled || !!onTap,
     minDistance: 3,
     onBegin: (e) => {
+      began.current = Date.now();
+      dragged.current = false;
       const { ctx } = latest.current;
       ctx.measureAll();
       calib.current = { dx: 0, dy: 0 };
@@ -187,6 +198,8 @@ export function Draggable({ payload, ghost, children, enabled = true, style, tes
     },
     onActivate: (e) => {
       const { payload, ghost, children, ctx } = latest.current;
+      dragged.current = true;
+      if (!latest.current.enabled) return;
       active.current = true;
       ctx.start(payload, ghost ?? children, e.absoluteX + calib.current.dx, e.absoluteY + calib.current.dy);
     },
@@ -203,6 +216,8 @@ export function Draggable({ payload, ghost, children, enabled = true, style, tes
       if (active.current) {
         active.current = false;
         latest.current.ctx.cancel();
+      } else if (!dragged.current && latest.current.onTap && Date.now() - began.current < 450) {
+        latest.current.onTap();
       }
     },
   });
