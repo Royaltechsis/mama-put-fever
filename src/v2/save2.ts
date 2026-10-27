@@ -24,6 +24,7 @@ export type Save2 = {
   deco: Partial<Record<Deco4, boolean>>;
   staff: Partial<Record<StaffId, boolean>>;
   prepSeen: boolean;
+  acctNote?: boolean;
   day: number;
 };
 export type Deco4 = 'gen' | 'tv' | 'canopy';

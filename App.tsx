@@ -19,6 +19,8 @@ import Prep, { type PrepResult } from './src/v2/Prep';
 import MyBuka from './src/v2/MyBuka';
 import DaySummary from './src/v2/DaySummary';
 import { wagesOf } from './src/v2/save2';
+import AccountPanel from './src/v2/Account';
+import { accountsAvailable, me, putSave, type User } from './src/v2/account';
 
 type Phase =
   | { p: 'map' }
@@ -34,6 +36,8 @@ type Phase =
 export default function App() {
   const [save, setSave] = useState<Save2 | null>(null);
   const [ph, setPh] = useState<Phase>({ p: 'map' });
+  const [user, setUser] = useState<User | null>(null);
+  const [acctOpen, setAcctOpen] = useState(false);
   useEffect(() => {
     loadSave2().then((s) => {
       if (Platform.OS === 'web' && typeof window !== 'undefined' && /unlockall/.test(window.location.hash)) {
@@ -42,6 +46,7 @@ export default function App() {
         (s as any).unlockAll = true;
       }
       activateDest((s.dest as DestId) || 'lagos'); setSave(s); setSoundEnabled(s.sound); setMusicEnabled(s.music);
+      if (accountsAvailable()) me().then((r) => { if (r.ok && r.user) setUser(r.user); });
     });
   }, []);
   useEffect(() => { setMood(ph.p === 'service' || ph.p === 'event' ? 'game' : 'menu'); }, [ph.p]);
@@ -71,6 +76,7 @@ export default function App() {
     if (stars > 0 && idx + 1 > save.unlocked && idx + 1 < LEVELS2.length) s.unlocked = idx + 1;
     for (let i = 0; i < LEVELS2.length; i++) if (s.stars[i] == null) s.stars[i] = 0;
     persist(s);
+    if (user) putSave(synced(s)); // keep the account copy in step at the end of each day
     setPh({ p: 'end', idx, service, event, stars, total, wages, day: save.day ?? 1 });
   }
 
@@ -87,7 +93,7 @@ export default function App() {
   let screen: React.ReactNode = null;
   if (!save) screen = <View style={{ flex: 1, backgroundColor: '#1E120A' }} />;
   else if (ph.p === 'map') {
-    screen = <WorldMap save={save} onBuka={() => setPh({ p: 'buka', back: 'map' })} onPick={enterDest} onMarket={() => setPh({ p: 'market', back: 'map' })} onToggleSound={toggleSound} onToggleMusic={toggleMusic} />;
+    screen = <WorldMap save={save} user={user} onAccount={() => setAcctOpen(true)} showNote={!save.acctNote} onDismissNote={() => persist({ ...save, acctNote: true })} onBuka={() => setPh({ p: 'buka', back: 'map' })} onPick={enterDest} onMarket={() => setPh({ p: 'market', back: 'map' })} onToggleSound={toggleSound} onToggleMusic={toggleMusic} />;
   } else if (ph.p === 'market') {
     const back = ph.back;
     screen = <Market save={save} onBuyStock={buyStock} onBuyKitchen={buyKitchen} onBuyDecor={buyDecor} onBack={() => setPh({ p: back })} />;
@@ -127,7 +133,10 @@ export default function App() {
       <SafeAreaProvider>
         <StatusBar hidden />
         <Stage>
-          <DragProvider>{screen}</DragProvider>
+          <DragProvider>
+            {screen}
+            {acctOpen && save && <AccountPanel save={save} user={user} onClose={() => setAcctOpen(false)} onUser={setUser} onLoadSave={(s) => { activateDest((s.dest as DestId) || 'lagos'); persist(s); }} />}
+          </DragProvider>
         </Stage>
       </SafeAreaProvider>
     </GestureHandlerRootView>

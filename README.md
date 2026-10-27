@@ -88,3 +88,22 @@ Every level is now one day at the buka:
 4. **My Buka** (`src/v2/MyBuka.tsx`), reachable from the map, city screen and summary: extra seats (3→5), wooden or cushioned chairs, canopy, generator, TV, the older decor, and hiring a cleaner (2⭐), waiter (5⭐) or cook (9⭐) for a daily wage.
 
 The save is now `mamaput.save.v4`. A v3 save migrates automatically and the v3 key is kept as a backup.
+
+## Accounts (optional)
+
+Players can create an account (username, email, password) at any time from the **Save progress** button on the map. The game still works fully as a guest with the save on the device. An account just keeps progress safe across devices.
+
+- API: Vercel serverless functions in `/api`: `auth/signup`, `auth/login`, `auth/logout`, `auth/me`, and `save` (GET/PUT). They live in the same project and are served from the same domain as the game.
+- Database: Neon Postgres through `@neondatabase/serverless`. The tables `mp_users` and `mp_saves` are created automatically on the first call.
+- Passwords are hashed with bcrypt. The session is an httpOnly cookie signed with `SESSION_SECRET`.
+- On login or signup, the device save and the account save are compared, and the one with more progress (stars, then days, then coins) is kept. After that, the save goes up to the account at the end of every day.
+- The static copies on `*.sites.tab.bot` have no API, so there the button explains that accounts live on the main site.
+
+### Set-up (one time, in Vercel → Project → Settings → Environment Variables)
+
+1. `DATABASE_URL`: your Neon connection string (`postgresql://...`).
+2. `SESSION_SECRET`: any long random string, e.g. the output of `openssl rand -hex 32`.
+
+Then redeploy. Until both are set, the account screen shows "Accounts are not set up on this server yet." and the game keeps working as a guest.
+
+Local test of the API without a database: `npm i --no-save pg-mem`, then run a harness that sets `globalThis.__mp_q` to a pg-mem query function (see `api/_lib.js`).

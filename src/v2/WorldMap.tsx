@@ -12,7 +12,7 @@ function Bob({ children, on }: { children: React.ReactNode; on: boolean }) {
   return <Animated.View style={a}>{children}</Animated.View>;
 }
 
-export default function WorldMap({ save, onPick, onMarket, onBuka, onToggleSound, onToggleMusic }: { save: Save2; onPick: (d: DestId) => void; onMarket: () => void; onBuka: () => void; onToggleSound: () => void; onToggleMusic: () => void }) {
+export default function WorldMap({ save, onPick, onMarket, onBuka, onToggleSound, onToggleMusic, user, onAccount, showNote, onDismissNote }: { user?: { username: string } | null; onAccount?: () => void; showNote?: boolean; onDismissNote?: () => void; save: Save2; onPick: (d: DestId) => void; onMarket: () => void; onBuka: () => void; onToggleSound: () => void; onToggleMusic: () => void }) {
   const S = useS();
   const stars = totalStars(save);
   const unlockAll = !!(save as any).unlockAll;
@@ -59,6 +59,19 @@ export default function WorldMap({ save, onPick, onMarket, onBuka, onToggleSound
           </Animated.View>
         );
       })}
+      {onAccount && (
+        <Abs x={652} y={288} w={186} h={32}>
+          <GameBtn label={user ? `👤 ${user.username}` : '👤 Save progress'} testID="acct-btn" color="blue" w={180} h={30} size={12} onPress={onAccount} />
+        </Abs>
+      )}
+      {showNote && onAccount && (
+        <Abs x={200} y={54} w={444} h={40}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2B1B12E6', borderRadius: S(12), paddingHorizontal: S(10), paddingVertical: S(6), borderWidth: S(1), borderColor: '#FFC93C' }}>
+            <Text onPress={onAccount} style={{ color: '#FFF', fontSize: S(11), fontWeight: '700', flex: 1 }}>💾 You can create an account anytime, it just keeps your progress safe across devices.</Text>
+            <Text testID="acct-note-x" onPress={onDismissNote} style={{ color: '#FFC93C', fontSize: S(14), fontWeight: '900', marginLeft: S(8) }}>✕</Text>
+          </View>
+        </Abs>
+      )}
       <Abs x={182} y={336} w={300} h={50}>
         <View style={{ flexDirection: 'row' }}>
           <GameBtn label="🧺 Go to Market" testID="map-market" color="orange" w={160} h={44} size={14} onPress={onMarket} />
