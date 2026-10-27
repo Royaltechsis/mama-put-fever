@@ -286,6 +286,7 @@ function ChopView({ cfg, R }: { cfg: Cfg; R: any }) {
         <LinearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#F4F7FA" /><Stop offset="0.6" stopColor="#B9C3CC" /><Stop offset="1" stopColor="#8D98A3" /></LinearGradient>
         <RadialGradient id="bowlg" cx="0.5" cy="0.35" r="0.7"><Stop offset="0" stopColor="#FFFFFF" /><Stop offset="1" stopColor="#B9C9D6" /></RadialGradient>
         {Array.from({ length: N }).map((_, k) => <ClipPath key={k} id={`strip${k}`}><Rect x={x0 + k * sw} y={cy - 120} width={sw + 0.5} height={240} /></ClipPath>)}
+        <ClipPath id="vegshape"><Path d={vegPath(veg.kind, cx, cy, w)} /></ClipPath>
       </Defs>
       {/* board */}
       <Rect x={190} y={135} width={440} height={210} rx={22} fill="#7A4A22" />
@@ -324,7 +325,7 @@ function ChopView({ cfg, R }: { cfg: Cfg; R: any }) {
         {/* fresh cut face on the remaining piece */}
         {cut > 0 && cut < N && (
           <G clipPath={`url(#strip${N - cut - 1})`}>
-            <Rect x={x0 + (N - cut) * sw - 5} y={cy - 80} width={5} height={160} fill={veg.inside} opacity={0.95} />
+            <G clipPath="url(#vegshape)"><Rect x={x0 + (N - cut) * sw - 5} y={cy - 80} width={5} height={160} fill={veg.inside} opacity={0.95} /></G>
           </G>
         )}
         {veg.kind === 'round' && cut < 5 && <Path d={`M ${cx - 8} ${cy - w * 0.4} l 8 -10 l 8 10 l 10 -4 l -8 10 z`} fill="#3F8A2E" />}
@@ -342,7 +343,7 @@ function ChopView({ cfg, R }: { cfg: Cfg; R: any }) {
           return (
             <G key={'c' + j} clipPath={`url(#strip${k})`} transform={`translate(${e * 30} 0)`}>
               <Path d={vegPath(veg.kind, cx, cy, w)} fill={veg.skin} />
-              <Rect x={x0 + k * sw} y={cy - 80} width={4} height={160} fill={veg.inside} />
+              <G clipPath="url(#vegshape)"><Rect x={x0 + k * sw} y={cy - 80} width={4} height={160} fill={veg.inside} /></G>
             </G>
           );
         }
