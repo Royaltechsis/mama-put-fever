@@ -12,7 +12,7 @@ function Bob({ children, on }: { children: React.ReactNode; on: boolean }) {
   return <Animated.View style={a}>{children}</Animated.View>;
 }
 
-export default function WorldMap({ save, onPick, onMarket, onToggleSound, onToggleMusic }: { save: Save2; onPick: (d: DestId) => void; onMarket: () => void; onToggleSound: () => void; onToggleMusic: () => void }) {
+export default function WorldMap({ save, onPick, onMarket, onBuka, onToggleSound, onToggleMusic }: { save: Save2; onPick: (d: DestId) => void; onMarket: () => void; onBuka: () => void; onToggleSound: () => void; onToggleMusic: () => void }) {
   const S = useS();
   const stars = totalStars(save);
   const unlockAll = !!(save as any).unlockAll;
@@ -59,8 +59,11 @@ export default function WorldMap({ save, onPick, onMarket, onToggleSound, onTogg
           </Animated.View>
         );
       })}
-      <Abs x={246} y={336} w={190} h={50}>
-        <GameBtn label="🧺 Go to Market" testID="map-market" color="orange" w={180} h={44} size={15} onPress={onMarket} />
+      <Abs x={182} y={336} w={300} h={50}>
+        <View style={{ flexDirection: 'row' }}>
+          <GameBtn label="🧺 Go to Market" testID="map-market" color="orange" w={160} h={44} size={14} onPress={onMarket} />
+          <GameBtn label="🏠 My Buka" testID="map-buka" color="purple" w={130} h={44} size={14} onPress={onBuka} style={{ marginLeft: S(8) }} />
+        </View>
       </Abs>
       <Abs x={640} y={322} w={200} h={20}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>

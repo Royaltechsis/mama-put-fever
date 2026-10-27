@@ -9,6 +9,9 @@ import { SPR } from './assets';
 import { LEVELS2, MENU, scriptFor, stationsFor, goalsFor, type Comp, type Drink, type MenuId } from './data2';
 import type { Save2, StockKey } from './save2';
 import { LBL, STOCK_INFO, STOCK_OF, RUNNER_MUL } from './dests';
+import type { PrepResult } from './Prep';
+import { CHAIRS, STAFF, type StaffId } from './save2';
+import Svg, { Rect as SRect, Path as SPath, Ellipse as SEllipse, Circle as SCircle } from 'react-native-svg';
 
 // customer sprites c0, c3, c5 are women; c1, c2, c4 are men (matches the arrival voice)
 const FEMALE_CUSTS = [0, 3, 5];
@@ -21,15 +24,16 @@ type Slot<T> = { item: T | null; start: number };
 
 type Cust = {
   id: number; who: number; items: { m: MenuId; done: boolean }[]; arrived: number; patience: number; // 0..1
-  state: 'waiting' | 'paid' | 'left'; coins: number; tip: number; leftAt: number;
+  state: 'waiting' | 'eating' | 'paid' | 'dirty' | 'left'; coins: number; tip: number; leftAt: number; eatUntil: number;
 };
 
-const SLOT_X = [96, 268, 440, 612];
+const SLOTS: Record<number, number[]> = { 3: [130, 330, 530], 4: [96, 268, 440, 612], 5: [70, 196, 322, 448, 574] };
+let SLOT_X = SLOTS[4];
 const PLATE_X = [300, 382, 464, 546];
 
-export type ServiceResult = { coins: number; served: number; lost: number; total: number; bestCombo: number; stock?: Record<StockKey, number>; runner?: number };
+export type ServiceResult = { tips?: number; coins: number; served: number; lost: number; total: number; bestCombo: number; stock?: Record<StockKey, number>; runner?: number };
 
-export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: number; save: Save2; onEnd: (r: ServiceResult) => void; onQuit: () => void }) {
+export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?: PrepResult | null; levelIdx: number; save: Save2; onEnd: (r: ServiceResult) => void; onQuit: () => void }) {
   const S = useS();
   const lv = LEVELS2[levelIdx];
   const st = useMemo(() => stationsFor(lv), [levelIdx]);
@@ -40,10 +44,13 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
   const potCap = 4 + 2 * (up.pot ?? 0);
   const fryN = (up.fryer ?? 0) >= 2 ? 3 : 2;
   const fryFast = (up.fryer ?? 0) >= 1 ? 0.75 : 1;
-  const pour = [2.4, 1.5, 0.9][up.drinks ?? 0];
+  const pour = [2.4, 1.5, 0.9][up.drinks ?? 0] * (save.deco?.gen ? 0.7 : 1);
+  const seats = Math.max(3, Math.min(5, save.seats ?? 4));
+  SLOT_X = SLOTS[seats];
+  const csc = seats >= 5 ? 0.84 : 1;
   const plateN = 3 + (up.plates ?? 0);
-  const patienceMul = 1 + (save.decor.ankara ? 0.15 : 0) + (save.decor.fans ? 0.1 : 0);
-  const tipMul = save.decor.music ? 1.2 : 1;
+  const patienceMul = 1 + (save.decor.ankara ? 0.15 : 0) + (save.decor.fans ? 0.1 : 0) + (save.deco?.tv ? 0.15 : 0) + (save.deco?.canopy ? 0.05 : 0) + ((save.chair ?? 0) >= 2 ? 0.1 : 0);
+  const tipMul = (save.decor.music ? 1.2 : 1) * (CHAIRS[save.chair ?? 0]?.tip ?? 1);
 
   const t0 = useRef(Date.now());
   const now = useNow(100);
@@ -63,10 +70,12 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     shake: {} as Record<string, number>,
     ended: false,
     msg: null as null | { text: string; id: number },
-    stock: { ...save.stock } as Record<StockKey, number>,
+    stock: { ...save.stock, pepper: (save.stock.pepper ?? 0) + (prep?.pepper ?? 0) } as Record<StockKey, number>,
     runner: 0,
+    tips: 0, cooler: prep?.cooler ?? 0, tray: prep?.tray ?? 0,
+    staffT: {} as Record<string, number>, staffPos: {} as Record<string, { x: number; until: number; act: string }>,
   });
-  if (g.current.custs.length === 0) g.current.custs = [null, null, null, null];
+  if (g.current.custs.length === 0) g.current.custs = Array.from({ length: seats }, () => null);
   const G = g.current;
   if (Platform.OS === 'web' && typeof window !== 'undefined') (window as any).__mp = { G, t: () => (Date.now() - t0.current) / 1000, COOK, BURN_AFTER, fryFast, pour, MENU };
   const rerender = () => force((x) => x + 1);
@@ -87,9 +96,9 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     if (free >= 0 && G.nextIdx < script.length && t >= script[G.nextIdx].at) {
       const sc = script[G.nextIdx++];
       // choose a free slot spread out
-      const order = [1, 2, 0, 3];
-      const slot = order.find((s) => G.custs[s] === null)!;
-      G.custs[slot] = { id: G.nextIdx, who: sc.who, items: sc.items.map((m) => ({ m, done: false })), arrived: t, patience: 1, state: 'waiting', coins: 0, tip: 0, leftAt: 0 };
+      const frees = G.custs.map((c, i) => (c === null ? i : -1)).filter((i) => i >= 0);
+      const slot = frees[Math.floor(Math.random() * frees.length)];
+      G.custs[slot] = { id: G.nextIdx, who: sc.who, items: sc.items.map((m) => ({ m, done: false })), arrived: t, patience: 1, state: 'waiting', coins: 0, tip: 0, leftAt: 0, eatUntil: 0 };
       play('customer', { female: FEMALE_CUSTS.includes(sc.who) });
     }
     // patience
@@ -108,13 +117,22 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     // burn warnings
     G.grill.forEach((s) => { if (s.item && t - s.start >= COOK[s.item] + BURN_AFTER && t - s.start < COOK[s.item] + BURN_AFTER + 0.12) play('burnt'); });
     G.fryer.forEach((s) => { if (!s.item) return; const e = (t - s.start) / fryFast; if (e >= COOK[s.item] + BURN_AFTER && e < COOK[s.item] + BURN_AFTER + 0.12 / fryFast) play('burnt'); });
+    // eating -> pays (coins appear), dirty plate after collecting
+    G.custs.forEach((c, i) => {
+      if (c && c.state === 'eating' && t >= c.eatUntil) { c.state = 'paid'; c.leftAt = t; const id = c.id; setTimeout(() => collect(i, id), 6000); }
+    });
+    // morning prep: the cooler refills the pot instantly
+    if (G.cooler > 0 && st.has('pot') && G.pot.portions <= 0 && G.pot.step === 0) {
+      const n = Math.min(G.cooler, potCap); G.cooler -= n; G.pot = { portions: n, step: 0, cookStart: 0 }; play('plop'); say(`${n} ${LBL.jollof} from the cooler!`);
+    }
+    staffTick();
     // end?
-    const allDone = G.nextIdx >= script.length && G.custs.every((c) => c === null);
+    const allDone = G.nextIdx >= script.length && G.custs.every((c) => c === null || c.state === 'dirty');
     if (t >= lv.duration || allDone) {
       G.ended = true;
       // auto-collect uncollected coins
-      G.custs.forEach((c) => { if (c && c.state === 'paid') G.coins += c.coins + c.tip; });
-      setTimeout(() => onEnd({ coins: G.coins, served: G.served, lost: G.lost + G.custs.filter((c) => c && c.state === 'waiting').length + (script.length - G.nextIdx), total: script.length, bestCombo: G.bestCombo, stock: { ...G.stock }, runner: G.runner }), 900);
+      G.custs.forEach((c) => { if (c && (c.state === 'paid' || c.state === 'eating')) { G.coins += c.coins + c.tip; G.tips += c.tip; } });
+      setTimeout(() => onEnd({ coins: G.coins, served: G.served, lost: G.lost + G.custs.filter((c) => c && c.state === 'waiting').length + (script.length - G.nextIdx), total: script.length, bestCombo: G.bestCombo, tips: G.tips, stock: { ...G.stock }, runner: G.runner }), 900);
     }
   }, [now]);
 
@@ -173,22 +191,82 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
       G.lastServe = t;
       G.bestCombo = Math.max(G.bestCombo, G.combo);
       const tip = Math.round((price * 0.25 * c.patience * tipMul + (G.combo >= 2 ? 50 * Math.min(G.combo, 5) : 0)) / 50) * 50;
-      c.state = 'paid'; c.coins = price; c.tip = tip; c.leftAt = t; G.served++;
+      c.state = 'eating'; c.eatUntil = t + 2.4; c.coins = price; c.tip = tip; c.leftAt = t; G.served++;
       play(G.combo >= 2 ? 'combo' : 'lick'); haptic.good();
       if (G.combo >= 2) say(`Combo x${G.combo}! 🔥`);
-      // auto-collect after a while so the line keeps moving
-      setTimeout(() => collect(ci, c.id), 6000);
     }
     return true;
   }
   function collect(ci: number, id?: number) {
     const c = G.custs[ci];
     if (!c || c.state !== 'paid' || (id != null && c.id !== id)) return;
-    G.coins += c.coins + c.tip;
+    G.coins += c.coins + c.tip; G.tips += c.tip;
     pop(SLOT_X[ci] + 10, 150, `+₦${(c.coins + c.tip).toLocaleString('en-US')}`);
     play('cash');
-    G.custs[ci] = null;
+    c.state = 'dirty'; c.leftAt = t;
     rerender();
+  }
+  function clearPlate(ci: number) {
+    const c = G.custs[ci];
+    if (!c || c.state !== 'dirty') return;
+    G.custs[ci] = null; play('plop'); rerender();
+  }
+  const tapTray = () => { if (G.tray <= 0) return; const pi = plateFor('dodo'); if (pi < 0) { say('No free plate for that'); play('bad'); return; } if (addToPlate(pi, 'dodo')) { G.tray--; rerender(); } };
+  // ---- hired help ----
+  function staffTick() {
+    const hired = save.staff ?? {};
+    const busy = (k: StaffId) => (G.staffT[k] ?? 0) > t;
+    const goTo = (k: StaffId, x: number, act: string, dur: number) => { G.staffT[k] = t + dur; G.staffPos[k] = { x, until: t + dur * 0.8, act }; };
+    if (hired.cleaner && !busy('cleaner')) {
+      const i = G.custs.findIndex((c) => c && c.state === 'dirty' && t - c.leftAt > 0.6);
+      if (i >= 0) { goTo('cleaner', SLOT_X[i] + 10, '🧽', 1.5); setTimeout(() => clearPlate(i), 750); }
+    }
+    if (hired.waiter && !busy('waiter')) {
+      let did = false;
+      G.custs.forEach((c, i) => {
+        if (did || !c || c.state !== 'paid' || t - c.leftAt < 1) return;
+        did = true; const id = c.id; goTo('waiter', SLOT_X[i] + 60, '💰', 1.1); setTimeout(() => collect(i, id), 500);
+      });
+      for (let pi = 0; pi < G.plates.length && !did; pi++) {
+        const p = G.plates[pi]; if (!p.length) continue;
+        G.custs.forEach((c, i) => {
+          if (did || !c || c.state !== 'waiting') return;
+          const need = c.items.find((it) => !it.done && MENU[it.m].comps && MENU[it.m].comps!.length === p.length && MENU[it.m].comps!.every((x) => p.includes(x)));
+          if (!need) return;
+          did = true; const id = c.id; goTo('waiter', SLOT_X[i] + 60, '🍽', 1.5);
+          setTimeout(() => { const cc = G.custs[i]; if (cc && cc.id === id && cc.state === 'waiting' && G.plates[pi].length && serve(i, { comps: [...G.plates[pi]] })) { G.plates[pi] = []; rerender(); } }, 500);
+        });
+      }
+      G.cups.forEach((s, k) => {
+        if (did || !s.item || !cupReady(s)) return;
+        const d = s.item;
+        G.custs.forEach((c, i) => {
+          if (did || !c || c.state !== 'waiting' || !c.items.some((it) => !it.done && MENU[it.m].drink === d)) return;
+          did = true; const id = c.id; goTo('waiter', SLOT_X[i] + 60, '🥤', 1.4);
+          setTimeout(() => { const cc = G.custs[i]; if (cc && cc.id === id && G.cups[k].item === d && serve(i, { drink: d })) { G.cups[k] = { item: null, start: 0 }; rerender(); } }, 500);
+        });
+      });
+    }
+    if (hired.cook && !busy('cook')) {
+      const recs = [['pot', ['blend', 'rice']], ['egusi', ['blend', 'ugu']]] as const;
+      for (const [which, rec] of recs) {
+        if (!st.has(which)) continue;
+        const P = G[which];
+        if (P.portions <= 0 && P.step !== 99 && P.step < rec.length && !(which === 'pot' && G.cooler > 0)) { goTo('cook', 30, '🥄', 1.6); potDrop(which, { kind: 'src', id: rec[P.step] }); rerender(); return; }
+      }
+      for (let k = 0; k < G.grill.length; k++) {
+        const s = G.grill[k];
+        if (s.item && grillState(s) === 'ready') { const pi = plateFor(s.item); if (pi >= 0) { goTo('cook', 60, '🍗', 1.4); onDropPlate(pi, { kind: 'grill', idx: k }); rerender(); return; } }
+      }
+      const want: Record<string, number> = {};
+      G.custs.forEach((c) => c && c.state === 'waiting' && c.items.forEach((it) => !it.done && MENU[it.m].comps?.forEach((x) => { want[x] = (want[x] ?? 0) + 1; })));
+      for (const [comp, src, stn] of [['chicken', 'chicken_raw', 'grillChicken'], ['suya', 'suya_raw', 'grillSuya']] as const) {
+        if (!st.has(stn)) continue;
+        const have = G.grill.filter((s) => s.item === comp && grillState(s) !== 'burnt').length + G.plates.filter((p) => p.includes(comp)).length;
+        if ((want[comp] ?? 0) > have && G.grill.some((s) => !s.item)) { goTo('cook', 60, '🔥', 1.6); tapSrcGrill(src); rerender(); return; }
+      }
+      G.staffT.cook = t + 0.8;
+    }
   }
 
   // ---- market stock ----
@@ -299,10 +377,33 @@ export default function Service({ levelIdx, save, onEnd, onQuit }: { levelIdx: n
     <View style={{ flex: 1 }}>
       <Image source={SPR.bg[save.decor.ankara ? 1 : 0]} style={{ position: 'absolute', left: 0, top: S(-85), width: S(SW), height: S(475) }} resizeMode="cover" />
 
+      {/* seats (chairs behind the counter) */}
+      {SLOT_X.map((x, i) => <Chair key={'ch' + i} x={x} tier={save.chair ?? 0} sc={csc} />)}
       {/* customers */}
       {G.custs.map((c, i) => c && (
-        <Customer key={c.id} c={c} x={SLOT_X[i]} t={t} shakeN={G.shake['cust' + i] ?? 0} onDrop={(p) => onDropCust(i, p)} onCollect={() => collect(i)} idx={i} />
+        <Customer key={c.id} c={c} x={SLOT_X[i]} t={t} sc={csc} shakeN={G.shake['cust' + i] ?? 0} onDrop={(p) => onDropCust(i, p)} onCollect={() => collect(i)} onClear={() => clearPlate(i)} idx={i} />
       ))}
+      {/* hired help */}
+      {(Object.keys(STAFF) as StaffId[]).filter((k) => save.staff?.[k]).map((k) => {
+        const idle = k === 'cook' ? -4 : k === 'waiter' ? 716 : 772;
+        const pos = G.staffPos[k];
+        const working = !!pos && pos.until > t;
+        return <StaffSprite key={k} id={k} x={working ? pos.x : idle} y={k === 'cook' ? 34 : working ? 52 : 26} act={working ? pos.act : ''} />;
+      })}
+      {G.cooler > 0 && st.has('pot') && (
+        <Abs x={2} y={136} w={56} h={44} pointerEvents="none">
+          <Image source={SPR.props.cooler} style={{ width: S(46), height: S(40) }} resizeMode="contain" />
+          <View style={{ position: 'absolute', right: 0, top: 0, backgroundColor: '#2FA544', borderRadius: S(8), paddingHorizontal: S(4) }}><Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(10) }}>{G.cooler}</Text></View>
+        </Abs>
+      )}
+      {G.tray > 0 && st.has('fryerDodo') && (
+        <Abs x={630} y={198} w={62} h={52}>
+          <Draggable payload={{ kind: 'src', id: 'tray' }} enabled={false} onTap={tapTray} testID="prep-tray" style={{ flex: 1, alignItems: 'center' }}>
+            <Image source={SPR.food.dodo} style={{ width: S(54), height: S(40) }} resizeMode="contain" />
+            <View style={{ position: 'absolute', right: 0, top: 0, backgroundColor: '#2FA544', borderRadius: S(8), paddingHorizontal: S(4) }}><Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(10) }}>{G.tray}</Text></View>
+          </Draggable>
+        </Abs>
+      )}
 
       {/* back row: pots, plates, drinks */}
       {st.has('pot') && (
@@ -535,13 +636,13 @@ function Plate({ x, y, comps, idx, shakeN, onDrop, onTap }: { x: number; y: numb
   );
 }
 
-function Customer({ c, x, t, shakeN, onDrop, onCollect, idx }: { c: Cust; x: number; t: number; shakeN: number; onDrop: (p: Payload) => void; onCollect: () => void; idx: number }) {
+function Customer({ c, x, t, shakeN, onDrop, onCollect, onClear, idx, sc = 1 }: { c: Cust; x: number; t: number; shakeN: number; onDrop: (p: Payload) => void; onCollect: () => void; onClear: () => void; idx: number; sc?: number }) {
   const S = useS();
   const bob = useSharedValue(0);
   useEffect(() => { bob.value = withRepeat(withSequence(withTiming(-3, { duration: 700, easing: Easing.inOut(Easing.quad) }), withTiming(0, { duration: 700, easing: Easing.inOut(Easing.quad) })), -1); }, []);
   const sh = useShake(shakeN);
   const bobSt = useAnimatedStyle(() => ({ transform: [{ translateY: bob.value }] }));
-  const mood = c.state === 'left' ? '😤' : c.state === 'paid' ? '😍' : c.patience > 0.6 ? '' : c.patience > 0.3 ? '😐' : '😠';
+  const mood = c.state === 'left' ? '😤' : c.state === 'paid' || c.state === 'eating' ? '😍' : c.patience > 0.6 ? '' : c.patience > 0.3 ? '😐' : '😠';
   const color = c.patience > 0.6 ? '#7BE36A' : c.patience > 0.3 ? '#FFC93C' : '#FF5A4A';
   const waiting = c.state === 'waiting';
   return (
@@ -549,12 +650,12 @@ function Customer({ c, x, t, shakeN, onDrop, onCollect, idx }: { c: Cust; x: num
       <Animated.View entering={FadeIn.duration(350)} exiting={FadeOut.duration(400)} style={{ position: 'absolute', left: S(x - 10), top: S(38), width: S(150), height: S(140), overflow: 'hidden' }}>
         <DropZone id={`cust-${idx}`} testID={`cust-${idx}`} accepts={(p) => waiting && (p.kind === 'plate' || p.kind === 'cup' || p.kind === 'grill' || p.kind === 'fryer')} onDrop={onDrop} style={{ flex: 1, borderRadius: S(20), borderWidth: S(2), borderColor: 'transparent' }} hoverStyle={{ borderColor: '#7BE36A', backgroundColor: '#7BE36A22' }}>
           <Animated.View style={[bobSt, sh, { alignItems: 'center', opacity: c.state === 'left' ? 0.5 : 1 }]}>
-            <Image source={SPR.cust[c.who]} style={{ width: S(120), height: S(150), marginTop: S(8) }} resizeMode="contain" />
+            {c.state !== 'dirty' && <Image source={SPR.cust[c.who]} style={{ width: S(120 * sc), height: S(150 * sc), marginTop: S(8 + (1 - sc) * 130) }} resizeMode="contain" />}
           </Animated.View>
         </DropZone>
       </Animated.View>
       {waiting && (
-        <Animated.View entering={ZoomIn.delay(200)} pointerEvents="none" style={{ position: 'absolute', left: S(x + 92), top: S(40), alignItems: 'center' }}>
+        <Animated.View entering={ZoomIn.delay(200)} pointerEvents="none" style={{ position: 'absolute', left: S(x + 92 * sc), top: S(40), alignItems: 'center' }}>
           <View style={{ backgroundColor: '#FFF', borderRadius: S(12), padding: S(4), borderWidth: S(2), borderColor: '#5E3A1A', minWidth: S(52) }}>
             {c.items.map((it, k) => (
               <View key={k} style={{ flexDirection: 'row', alignItems: 'center', opacity: it.done ? 0.35 : 1 }}>
@@ -568,6 +669,21 @@ function Customer({ c, x, t, shakeN, onDrop, onCollect, idx }: { c: Cust; x: num
           </View>
           {mood ? <Text style={{ fontSize: S(16), marginTop: S(1) }}>{mood}</Text> : null}
         </Animated.View>
+      )}
+      {c.state === 'eating' && (
+        <Abs x={x + 22} y={140} w={90} h={44} pointerEvents="none">
+          <View style={{ alignItems: 'center' }}>
+            {(() => { const m = c.items.find((it) => MENU[it.m].comps); return m ? <PlateView comps={MENU[m.m].comps!} w={58} /> : <Image source={SPR.props[MENU[c.items[0].m].drink!]} style={{ width: S(30), height: S(36) }} resizeMode="contain" />; })()}
+            <Text style={{ position: 'absolute', top: S(-16 - 4 * Math.abs(Math.sin(t * 8))), right: S(8), fontSize: S(16) }}>🥄</Text>
+          </View>
+        </Abs>
+      )}
+      {c.state === 'dirty' && (
+        <Abs x={x + 18} y={136} w={90} h={50}>
+          <Draggable payload={{ kind: 'src', id: 'dirty' }} enabled={false} onTap={onClear} testID={`dirty-${idx}`} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <DirtyPlate />
+          </Draggable>
+        </Abs>
       )}
       {c.state === 'paid' && (
         <Abs x={x + 20} y={150} w={80} h={40}>
@@ -610,5 +726,71 @@ function Hud2({ tl, total, coins, goals, stars, cust, name, onQuit }: { tl: numb
         <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(13) }}>II</Text>
       </Draggable>
     </View>
+  );
+}
+
+function DirtyPlate() {
+  const S = useS();
+  return (
+    <Svg width={S(74)} height={S(40)} viewBox="0 0 74 40">
+      <SEllipse cx={37} cy={24} rx={34} ry={14} fill="#00000033" />
+      <SEllipse cx={37} cy={20} rx={33} ry={14} fill="#F4F1EA" stroke="#C9C2B2" strokeWidth={1.5} />
+      <SEllipse cx={37} cy={20} rx={22} ry={9} fill="#E9E3D6" />
+      <SPath d="M 22 18 q 8 -6 16 0 q 6 4 12 -2" stroke="#C8501E" strokeWidth={4} fill="none" strokeLinecap="round" opacity={0.75} />
+      <SCircle cx={46} cy={23} r={2.5} fill="#B5651D" /><SCircle cx={28} cy={24} r={2} fill="#7A9A3A" />
+      <SRect x={50} y={4} width={4} height={18} rx={2} fill="#B8BEC6" transform="rotate(35 52 13)" />
+    </Svg>
+  );
+}
+
+function Chair({ x, tier, sc }: { x: number; tier: number; sc: number }) {
+  const S = useS();
+  const w = 104 * sc;
+  const colors = [['#E23B2E', '#B32418'], ['#9A6232', '#6E4220'], ['#7A4A28', '#5A341A']][tier] ?? ['#E23B2E', '#B32418'];
+  return (
+    <Abs x={x + 10 + (1 - sc) * 20} y={58 + (1 - sc) * 30} w={w} h={124 * sc} pointerEvents="none">
+      <Svg width={S(w)} height={S(124 * sc)} viewBox="0 0 104 124">
+        {tier === 0 && (<>
+          <SRect x={10} y={8} width={84} height={70} rx={22} fill={colors[0]} />
+          <SRect x={10} y={8} width={84} height={14} rx={7} fill="#FF6A5A" opacity={0.6} />
+          {[28, 44, 60, 76].map((xx) => <SRect key={xx} x={xx - 4} y={30} width={8} height={34} rx={4} fill={colors[1]} />)}
+          <SRect x={14} y={74} width={10} height={50} rx={4} fill={colors[1]} /><SRect x={80} y={74} width={10} height={50} rx={4} fill={colors[1]} />
+        </>)}
+        {tier === 1 && (<>
+          <SRect x={12} y={4} width={12} height={120} rx={3} fill={colors[1]} /><SRect x={80} y={4} width={12} height={120} rx={3} fill={colors[1]} />
+          {[12, 34, 56].map((yy) => <SRect key={yy} x={12} y={yy} width={80} height={14} rx={3} fill={colors[0]} />)}
+        </>)}
+        {tier === 2 && (<>
+          <SRect x={8} y={2} width={88} height={84} rx={16} fill={colors[1]} />
+          <SRect x={16} y={10} width={72} height={68} rx={14} fill="#C8283A" />
+          {[30, 52, 74].map((xx) => <SCircle key={xx} cx={xx} cy={44} r={3} fill="#8E1424" />)}
+          <SRect x={14} y={84} width={10} height={40} rx={3} fill={colors[1]} /><SRect x={80} y={84} width={10} height={40} rx={3} fill={colors[1]} />
+        </>)}
+      </Svg>
+    </Abs>
+  );
+}
+
+function StaffSprite({ id, x, y, act }: { id: StaffId; x: number; y: number; act: string }) {
+  const S = useS();
+  const info = STAFF[id];
+  const ax = useSharedValue(x);
+  useEffect(() => { ax.value = withTiming(x, { duration: 380, easing: Easing.inOut(Easing.quad) }); }, [x]);
+  const st = useAnimatedStyle(() => ({ left: ax.value * (S(1)) }));
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: S(y), width: S(84), height: S(128), alignItems: 'center' }, st]}>
+      <Image source={SPR.cust[info.who]} style={{ width: S(84), height: S(112) }} resizeMode="contain" />
+      <Svg width={S(84)} height={S(128)} viewBox="0 0 84 128" style={{ position: 'absolute', top: 0, left: 0 }}>
+        {id === 'cook' && (<><SRect x={26} y={-2} width={32} height={14} rx={4} fill="#FFFFFF" /><SEllipse cx={34} cy={-2} rx={10} ry={8} fill="#FFFFFF" /><SEllipse cx={50} cy={-2} rx={10} ry={8} fill="#FFFFFF" /></>)}
+        {id === 'cleaner' && <SPath d="M 22 12 q 20 -16 40 0 l -2 6 q -18 -8 -36 0 z" fill={info.color} />}
+        <SPath d="M 24 62 L 60 62 L 66 112 L 18 112 Z" fill="#FFFFFF" stroke="#D9D2C4" strokeWidth={1.5} opacity={0.95} />
+        <SRect x={24} y={60} width={36} height={6} fill={info.color} />
+        <SPath d="M 28 62 L 22 44 M 56 62 L 62 44" stroke="#FFFFFF" strokeWidth={3} />
+      </Svg>
+      <View style={{ position: 'absolute', bottom: S(4), backgroundColor: info.color, borderRadius: S(6), paddingHorizontal: S(5) }}>
+        <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(9) }}>{id === 'cook' ? 'Cook' : id === 'waiter' ? 'Waiter' : 'Cleaner'}</Text>
+      </View>
+      {act ? <Text style={{ position: 'absolute', top: S(-8), right: S(0), fontSize: S(18) }}>{act}</Text> : null}
+    </Animated.View>
   );
 }

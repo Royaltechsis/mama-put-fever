@@ -70,7 +70,38 @@ export function setSoundEnabled(v: boolean) {
   enabled = v;
 }
 
+export const soundOn = () => enabled;
+function logSnd(name: string) { try { const g = globalThis as any; if (g.__sndlog) g.__sndlog.push({ t: Date.now(), name }); } catch {} }
+
+// synthesized kitchen sounds (web only): knife on board, quick sizzle crackle
+let actx: any = null;
+export function synth(kind: 'chop' | 'crackle' | 'bubble') {
+  if (!enabled || Platform.OS !== 'web') return;
+  logSnd('syn_' + kind);
+  try {
+    const AC = (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext;
+    if (!AC) return;
+    actx = actx || new AC();
+    const a = actx; const t0 = a.currentTime;
+    const n = Math.floor(a.sampleRate * (kind === 'chop' ? 0.09 : kind === 'bubble' ? 0.06 : 0.25));
+    const buf = a.createBuffer(1, n, a.sampleRate); const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) {
+      const env = kind === 'chop' ? Math.exp(-i / (n * 0.12)) : kind === 'bubble' ? Math.sin(Math.PI * i / n) : (Math.random() < 0.02 ? 1 : 0.15) * (1 - i / n);
+      d[i] = (Math.random() * 2 - 1) * env;
+    }
+    const src = a.createBufferSource(); src.buffer = buf;
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = kind === 'chop' ? 2400 : kind === 'bubble' ? 500 : 5000; f.Q.value = kind === 'bubble' ? 4 : 0.8;
+    const g = a.createGain(); g.gain.value = kind === 'chop' ? 0.9 : kind === 'bubble' ? 0.5 : 0.35;
+    src.connect(f); f.connect(g); g.connect(a.destination); src.start(t0);
+    if (kind === 'chop') { // wooden board thunk under the blade click
+      const o = a.createOscillator(); const og = a.createGain(); o.frequency.setValueAtTime(180, t0); o.frequency.exponentialRampToValueAtTime(70, t0 + 0.08);
+      og.gain.setValueAtTime(0.7, t0); og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.1); o.connect(og); og.connect(a.destination); o.start(t0); o.stop(t0 + 0.12);
+    }
+  } catch {}
+}
+
 function raw(name: Src) {
+  logSnd(name);
   try {
     let p = players[name];
     if (!p) {

@@ -77,3 +77,14 @@ All audio is original and generated for this project (no samples from existing s
 | Sad sax | `fail.mp3` | Level failed |
 
 Art and audio are AI-generated for this project. Gameplay mechanics are inspired by Cooking Fever; no assets come from it.
+
+## v5: run a full buka (day loop)
+
+Every level is now one day at the buka:
+
+1. **Morning prep** (`src/v2/Prep.tsx`): three cooking mini-games drawn in SVG. Chop pepper, tomato and onion on the board (tap or swipe). Stir the pot in circles with Low/Med/High heat; it changes colour as it cooks, and leaving high heat unstirred burns the bottom. Fry dodo and flip each piece when it turns golden. Ibadan does amala and fried beef; Port Harcourt does pepper soup and roasted bole. Your prep score decides how many jollof portions start in the cooler, how much dodo starts on the tray, and how much bonus pepper stock you get. Prep can be skipped after the first time.
+2. **Service** (`src/v2/Service.tsx`): customers sit on your chairs, eat, pay, and leave a dirty plate. Tap the plate to clear the seat. Hired staff do their jobs on screen: the cleaner clears plates, the waiter carries finished plates, drinks and coins, and the cook keeps the pot and grill going.
+3. **Day summary** (`src/v2/DaySummary.tsx`): food sales, tips, wages and profit.
+4. **My Buka** (`src/v2/MyBuka.tsx`), reachable from the map, city screen and summary: extra seats (3→5), wooden or cushioned chairs, canopy, generator, TV, the older decor, and hiring a cleaner (2⭐), waiter (5⭐) or cook (9⭐) for a daily wage.
+
+The save is now `mamaput.save.v4`. A v3 save migrates automatically and the v3 key is kept as a backup.

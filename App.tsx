@@ -10,20 +10,26 @@ import Home2 from './src/v2/Home2';
 import Service, { type ServiceResult } from './src/v2/Service';
 import OwambeEvent, { type EventResult } from './src/v2/OwambeEvent';
 import { LevelEnd, LevelIntro } from './src/v2/LevelCards';
-import { DECOR, KITCHEN, LEVELS2, goalsFor } from './src/v2/data2';
+import { DECOR, KITCHEN, LEVELS2, goalsFor, stationsFor } from './src/v2/data2';
 import { DEFAULT_SAVE2, loadSave2, writeSave2, synced, type Save2, type StockKey } from './src/v2/save2';
 import { activateDest, destById, STOCK_INFO, type DestId } from './src/v2/dests';
 import WorldMap from './src/v2/WorldMap';
 import Market from './src/v2/Market';
+import Prep, { type PrepResult } from './src/v2/Prep';
+import MyBuka from './src/v2/MyBuka';
+import DaySummary from './src/v2/DaySummary';
+import { wagesOf } from './src/v2/save2';
 
 type Phase =
   | { p: 'map' }
   | { p: 'home' }
   | { p: 'market'; back: 'map' | 'home' }
   | { p: 'intro'; idx: number }
-  | { p: 'service'; idx: number; key: number }
+  | { p: 'prep'; idx: number; key: number }
+  | { p: 'buka'; back: 'map' | 'home' }
+  | { p: 'service'; idx: number; key: number; prep?: PrepResult | null }
   | { p: 'event'; idx: number; service: ServiceResult }
-  | { p: 'end'; idx: number; service: ServiceResult; event: EventResult | null; stars: number; total: number };
+  | { p: 'end'; idx: number; service: ServiceResult; event: EventResult | null; stars: number; total: number; wages: number; day: number };
 
 export default function App() {
   const [save, setSave] = useState<Save2 | null>(null);
@@ -57,13 +63,15 @@ export default function App() {
     const goals = goalsFor(idx);
     const stars = goals.filter((g) => total >= g).length;
     const s: Save2 = { ...save, stars: [...save.stars], best: [...save.best], stock: service.stock ?? save.stock };
-    s.coins = save.coins + total;
+    const wages = wagesOf(save);
+    s.coins = Math.max(0, save.coins + total - wages);
+    s.day = (save.day ?? 1) + 1;
     s.stars[idx] = Math.max(save.stars[idx] ?? 0, stars);
     s.best[idx] = Math.max(save.best[idx] ?? 0, total);
     if (stars > 0 && idx + 1 > save.unlocked && idx + 1 < LEVELS2.length) s.unlocked = idx + 1;
     for (let i = 0; i < LEVELS2.length; i++) if (s.stars[i] == null) s.stars[i] = 0;
     persist(s);
-    setPh({ p: 'end', idx, service, event, stars, total });
+    setPh({ p: 'end', idx, service, event, stars, total, wages, day: save.day ?? 1 });
   }
 
   const quit = () => {
@@ -79,30 +87,39 @@ export default function App() {
   let screen: React.ReactNode = null;
   if (!save) screen = <View style={{ flex: 1, backgroundColor: '#1E120A' }} />;
   else if (ph.p === 'map') {
-    screen = <WorldMap save={save} onPick={enterDest} onMarket={() => setPh({ p: 'market', back: 'map' })} onToggleSound={toggleSound} onToggleMusic={toggleMusic} />;
+    screen = <WorldMap save={save} onBuka={() => setPh({ p: 'buka', back: 'map' })} onPick={enterDest} onMarket={() => setPh({ p: 'market', back: 'map' })} onToggleSound={toggleSound} onToggleMusic={toggleMusic} />;
   } else if (ph.p === 'market') {
     const back = ph.back;
     screen = <Market save={save} onBuyStock={buyStock} onBuyKitchen={buyKitchen} onBuyDecor={buyDecor} onBack={() => setPh({ p: back })} />;
   } else if (ph.p === 'home') {
     screen = (
       <Home2 save={save} dest={destById(save.dest)} onPlay={(i) => setPh({ p: 'intro', idx: i })}
-        onMap={() => setPh({ p: 'map' })} onMarket={() => setPh({ p: 'market', back: 'home' })}
+        onMap={() => setPh({ p: 'map' })} onBuka={() => setPh({ p: 'buka', back: 'home' })} onMarket={() => setPh({ p: 'market', back: 'home' })}
         onBuyKitchen={buyKitchen} onBuyDecor={buyDecor} onToggleSound={toggleSound} onToggleMusic={toggleMusic}
         onReset={() => { if (Platform.OS !== 'web' || window.confirm('Reset all progress (every city)?')) { activateDest('lagos'); persist({ ...DEFAULT_SAVE2 }); setPh({ p: 'map' }); } }} />
     );
   } else if (ph.p === 'intro') {
-    screen = <LevelIntro idx={ph.idx} ankara={!!save.decor.ankara} stock={save.stock} onMarket={() => setPh({ p: 'market', back: 'home' })} onBack={() => setPh({ p: 'home' })} onStart={() => setPh({ p: 'service', idx: ph.idx, key: Date.now() })} />;
+    screen = <LevelIntro idx={ph.idx} ankara={!!save.decor.ankara} stock={save.stock} onMarket={() => setPh({ p: 'market', back: 'home' })} onBack={() => setPh({ p: 'home' })} onStart={() => setPh({ p: 'prep', idx: ph.idx, key: Date.now() })} />;
+  } else if (ph.p === 'prep') {
+    const idx = ph.idx;
+    screen = <Prep key={ph.key} dest={save.dest} canSkip={!!save.prepSeen} hasFry={stationsFor(LEVELS2[idx]).has('fryerDodo')}
+      onDone={(r) => { if (!save.prepSeen) persist({ ...save, prepSeen: true }); setPh({ p: 'service', idx, key: Date.now(), prep: r }); }} />;
+  } else if (ph.p === 'buka') {
+    const back = ph.back;
+    screen = <MyBuka save={save} onSave={persist} onBack={() => setPh({ p: back })} onMarket={() => setPh({ p: 'market', back: 'home' })} />;
   } else if (ph.p === 'service') {
     const idx = ph.idx;
-    screen = <Service key={ph.key} levelIdx={idx} save={save} onQuit={quit}
+    screen = <Service key={ph.key} levelIdx={idx} save={save} prep={ph.prep} onQuit={quit}
       onEnd={(r) => (LEVELS2[idx].bulk ? setPh({ p: 'event', idx, service: r }) : finishLevel(idx, r, null))} />;
   } else if (ph.p === 'event') {
     const { idx, service } = ph;
     screen = <OwambeEvent bulk={LEVELS2[idx].bulk!} bigPot={(save.kitchen.pot ?? 0) >= 1} onDone={(e) => finishLevel(idx, service, e)} />;
   } else if (ph.p === 'end') {
     const { idx } = ph;
-    screen = <LevelEnd idx={idx} ankara={!!save.decor.ankara} service={ph.service} event={ph.event} stars={ph.stars} total={ph.total}
-      onHome={() => setPh({ p: 'home' })} onRetry={() => setPh({ p: 'intro', idx })} onNext={() => setPh({ p: 'intro', idx: Math.min(idx + 1, LEVELS2.length - 1) })} />;
+    screen = <DaySummary day={ph.day} idx={idx} ankara={!!save.decor.ankara} service={ph.service} event={ph.event} stars={ph.stars} total={ph.total} wages={ph.wages}
+      staffCount={Object.values(save.staff ?? {}).filter(Boolean).length}
+      onHome={() => setPh({ p: 'home' })} onBuka={() => setPh({ p: 'buka', back: 'home' })} onMarket={() => setPh({ p: 'market', back: 'home' })}
+      onRetry={() => setPh({ p: 'intro', idx })} onNext={() => setPh({ p: 'intro', idx: Math.min(idx + 1, LEVELS2.length - 1) })} />;
   }
 
   return (

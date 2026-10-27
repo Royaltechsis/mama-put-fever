@@ -13,8 +13,8 @@ const NODE = (i: number) => {
   return { x: 300 + col * 88, y: 92 + row * 120 + (col % 2) * 26 };
 };
 
-export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuyKitchen, onBuyDecor, onToggleSound, onToggleMusic, onReset }: {
-  save: Save2; dest: Dest; onPlay: (i: number) => void; onMap: () => void; onMarket: () => void; onBuyKitchen: (k: KitchenUp) => void; onBuyDecor: (d: DecorUp) => void; onToggleSound: () => void; onToggleMusic: () => void; onReset: () => void;
+export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuka, onBuyKitchen, onBuyDecor, onToggleSound, onToggleMusic, onReset }: {
+  save: Save2; dest: Dest; onPlay: (i: number) => void; onMap: () => void; onMarket: () => void; onBuka: () => void; onBuyKitchen: (k: KitchenUp) => void; onBuyDecor: (d: DecorUp) => void; onToggleSound: () => void; onToggleMusic: () => void; onReset: () => void;
 }) {
   const S = useS();
   const [shop, setShop] = useState<null | 'kitchen' | 'decor'>(null);
@@ -38,9 +38,11 @@ export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuyKitche
       <Abs x={14} y={224} w={270} h={160}>
         <GameBtn label="▶ PLAY" testID="play" w={240} h={54} size={24} onPress={() => onPlay(Math.min(save.unlocked, LEVELS2.length - 1))} />
         <View style={{ flexDirection: 'row', marginTop: S(8) }}>
-          <GameBtn label="🗺 Map" testID="to-map" color="purple" w={116} h={42} size={14} onPress={onMap} />
+          <GameBtn label="🗺 Map" testID="to-map" color="purple" w={84} h={42} size={13} onPress={onMap} />
           <View style={{ width: S(8) }} />
-          <GameBtn label="🧺 Market" testID="to-market" color="blue" w={116} h={42} size={14} onPress={onMarket} />
+          <GameBtn label="🧺 Market" testID="to-market" color="blue" w={84} h={42} size={13} onPress={onMarket} />
+          <View style={{ width: S(8) }} />
+          <GameBtn label="🏠 Buka" testID="to-buka" color="orange" w={84} h={42} size={13} onPress={onBuka} />
         </View>
         <View style={{ flexDirection: 'row', marginTop: S(6) }}>
           <Pressable testID="toggle-music" onPress={onToggleMusic} style={{ marginRight: S(14) }}><Text style={{ color: '#FFF', fontWeight: '800', fontSize: S(12) }}>{save.music ? '🎵 Music on' : '🔇 Music off'}</Text></Pressable>
