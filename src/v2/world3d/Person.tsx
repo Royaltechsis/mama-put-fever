@@ -4,6 +4,7 @@ import type { Group } from 'three';
 
 export type HairStyle = 'none' | 'short' | 'afro' | 'braids' | 'bun' | 'wrap' | 'cap' | 'fila';
 export type Look = {
+  female?: boolean; // picks the female body when imported models are used
   skin: string; hair: string; hairStyle: HairStyle; hat?: string; top: string; bottom: string;
   h?: number; build?: number; // height and width scale around 1
   long?: boolean; // long sleeves
@@ -20,17 +21,17 @@ export type PoseOut = {
 const SKIN = ['#A06A46', '#8F5A3A', '#B07850', '#7E4C30', '#996444', '#B98458'];
 /** the six customer types: who 0,3,5 are women, 1,2,4 are men (matches the arrival voices) */
 export const CUST_LOOKS: Look[] = [
-  { skin: SKIN[0], hair: '#161616', hairStyle: 'wrap', hat: '#8E44AD', top: '#E0902A', bottom: '#5B3A8A', dress: true, lip: '#8B2E3C', h: 0.95, build: 0.94 },
+  { female: true, skin: SKIN[0], hair: '#161616', hairStyle: 'wrap', hat: '#8E44AD', top: '#E0902A', bottom: '#5B3A8A', dress: true, lip: '#8B2E3C', h: 0.95, build: 0.94 },
   { skin: SKIN[1], hair: '#111111', hairStyle: 'fila', hat: '#2F5FB8', top: '#3A74D6', bottom: '#2F5FB8', robe: true, long: true, h: 1.04, build: 1.05 },
   { skin: SKIN[2], hair: '#111111', hairStyle: 'afro', top: '#D7263D', bottom: '#2B3A55', h: 1.0 },
-  { skin: SKIN[3], hair: '#1A1A1A', hairStyle: 'braids', top: '#F2C230', bottom: '#34495E', lip: '#7A2A3A', h: 0.96, build: 0.92 },
+  { female: true, skin: SKIN[3], hair: '#1A1A1A', hairStyle: 'braids', top: '#F2C230', bottom: '#34495E', lip: '#7A2A3A', h: 0.96, build: 0.92 },
   { skin: SKIN[4], hair: '#111111', hairStyle: 'short', top: '#F4F4F0', bottom: '#1E2A44', tie: '#243B7A', glasses: true, long: true, h: 1.02 },
-  { skin: SKIN[5], hair: '#222222', hairStyle: 'bun', top: '#2FA544', bottom: '#6B4A2B', lip: '#9A3A48', h: 0.94, build: 0.93 },
+  { female: true, skin: SKIN[5], hair: '#222222', hairStyle: 'bun', top: '#2FA544', bottom: '#6B4A2B', lip: '#9A3A48', h: 0.94, build: 0.93 },
 ];
 export const STAFF_LOOKS: Record<'cook' | 'waiter' | 'cleaner', Look[]> = {
   cook: [
-    { skin: SKIN[3], hair: '#161616', hairStyle: 'cap', hat: '#F2A93B', top: '#6B3E26', bottom: '#3A2A20', apron: '#F2A93B', tail: true, lip: '#7A2A3A', h: 0.96, build: 0.98 },
-    { skin: SKIN[0], hair: '#161616', hairStyle: 'cap', hat: '#E8F0F2', top: '#F4F4F0', bottom: '#3A2A20', apron: '#E8F0F2', tail: true, lip: '#8B2E3C', h: 0.95 },
+    { female: true, skin: SKIN[3], hair: '#161616', hairStyle: 'cap', hat: '#F2A93B', top: '#6B3E26', bottom: '#3A2A20', apron: '#F2A93B', tail: true, lip: '#7A2A3A', h: 0.96, build: 0.98 },
+    { female: true, skin: SKIN[0], hair: '#161616', hairStyle: 'cap', hat: '#E8F0F2', top: '#F4F4F0', bottom: '#3A2A20', apron: '#E8F0F2', tail: true, lip: '#8B2E3C', h: 0.95 },
   ],
   waiter: [
     { skin: SKIN[4], hair: '#111111', hairStyle: 'short', top: '#F4F4F0', bottom: '#15151A', vest: '#22222A', tie: '#C0392B', glasses: true, long: true, h: 1.03 },
@@ -38,8 +39,8 @@ export const STAFF_LOOKS: Record<'cook' | 'waiter' | 'cleaner', Look[]> = {
     { skin: SKIN[1], hair: '#111111', hairStyle: 'cap', hat: '#22222A', top: '#F4F4F0', bottom: '#15151A', vest: '#22222A', tie: '#C0392B', long: true, h: 1.05 },
   ],
   cleaner: [
-    { skin: SKIN[5], hair: '#161616', hairStyle: 'wrap', hat: '#3FA7D6', top: '#2D7FD6', bottom: '#2D7FD6', gloves: true, lip: '#9A3A48', h: 0.93, build: 1.0 },
-    { skin: SKIN[3], hair: '#161616', hairStyle: 'wrap', hat: '#E8453C', top: '#2D7FD6', bottom: '#2D7FD6', gloves: true, lip: '#7A2A3A', h: 0.95 },
+    { female: true, skin: SKIN[5], hair: '#161616', hairStyle: 'wrap', hat: '#3FA7D6', top: '#2D7FD6', bottom: '#2D7FD6', gloves: true, lip: '#9A3A48', h: 0.93, build: 1.0 },
+    { female: true, skin: SKIN[3], hair: '#161616', hairStyle: 'wrap', hat: '#E8453C', top: '#2D7FD6', bottom: '#2D7FD6', gloves: true, lip: '#7A2A3A', h: 0.95 },
   ],
 };
 

@@ -4,8 +4,11 @@ import { MENU } from '../data2';
 import type { StaffId } from '../save2';
 import { CANVAS_H, CHEF_X, DOOR_X, X_OF, Z_BACK, Z_SEAT, ZPX, kitchenZ, yToZ } from './geom';
 import { GLCanvas } from './GLCanvas';
-import { CUST_LOOKS, Person, STAFF_LOOKS, type Carry, type PoseOut } from './Person';
+import { CUST_SHEETS, STAFF_SHEETS } from '../animSheets';
+import { SPR } from '../assets';
+import { CUST_LOOKS, STAFF_LOOKS, type Carry, type PoseOut } from './Person';
 import { Room } from './Room';
+import { BODY, BUST, SpritePerson } from './SpritePerson';
 
 /** the bits of a staff member's movement state that the 3D scene reads every frame */
 export type StaffView = {
@@ -36,6 +39,7 @@ function carryKind(emoji: string | null): Carry {
 
 function Customer3D({ c, seat, plan, now }: { c: Cust; seat: number; plan: Plan; now: () => number }) {
   const look = CUST_LOOKS[c.who % CUST_LOOKS.length];
+  const src = SPR.cust[c.who % SPR.cust.length];
   const sx = X_OF(plan.seatX[seat]);
   const pose = (): PoseOut => {
     const t = now();
@@ -62,7 +66,7 @@ function Customer3D({ c, seat, plan, now }: { c: Cust; seat: number; plan: Plan;
   const onTable = c.state === 'eating' || c.state === 'dirty';
   return (
     <>
-      <Person look={look} pose={pose} />
+      <SpritePerson sheet={CUST_SHEETS.get(src)} src={src} cut={BUST} staff={false} look={look} pose={pose} />
       {onTable && (
         <group position={[sx, 0.83, -0.2]}>
           {dish ? (<>
@@ -94,7 +98,7 @@ function Staff3D({ m, now }: { m: CrewMember; now: () => number }) {
     const carry = carryKind(m.rt.carry);
     return { x: X, z: Z, rotY: cook && moving ? (dx > 0 ? 0 : Math.PI) : last.current, mode: moving ? 'walk' : 'stand', visible: true, carry, busy: !moving && !!m.rt.act };
   };
-  return <Person look={look} pose={pose} />;
+  return <SpritePerson sheet={STAFF_SHEETS[m.role]} src={SPR.staff[m.role]} cut={BODY} staff look={look} pose={pose} />;
 }
 
 export function World3D({ k, plan, custs, crew, chairTier, ankara, now, paused }: {
