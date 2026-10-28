@@ -44,8 +44,9 @@ export const SPR = {
     tray: require('../../assets/v2/tray.webp'),
   },
   staff: {
-    cook: require('../../assets/v2/staff_cook.webp'),
-    waiter: require('../../assets/v2/staff_waiter.webp'),
+    // Iya Bisi the cook is a woman; Tunde the waiter reuses the shirt-and-tie portrait until there is dedicated waiter art
+    cook: require('../../assets/v2/staff_waiter.webp'),
+    waiter: require('../../assets/v2/c4.webp'),
     cleaner: require('../../assets/v2/staff_cleaner.webp'),
   } as Record<'cook' | 'waiter' | 'cleaner', any>,
   cust: [0, 1, 2, 3, 4, 5].map((i) => [

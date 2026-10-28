@@ -8,7 +8,7 @@ A **Cooking Fever-style** restaurant time-management game that travels across Ni
 - **World map of Nigeria**: Lagos (jollof, chicken, suya, dodo), **Ibadan** (amala + ewedu + gbegiri, asun, fried beef; 8 levels, unlocks at 5⭐) and **Port Harcourt** (bole & fish with pepper sauce, catfish pepper soup, starch + banga, palm wine; 8 levels, unlocks at 12⭐). Enugu, Kano and Abuja are on the map as *coming soon*.
 - **Oja (market)**: stalls for pepper & tomato, rice/beans/flour, meat & fish, plantain/yam/greens and drinks. Every pot, grill item and drink uses stock; restock with ₦ (if you run out mid-shift the errand boy buys more at double price). Kitchen gear and decor are sold here too.
 - Saves migrate automatically from `mamaput.save.v2` to `mamaput.save.v3` (Lagos progress kept).
-- Customers **walk in, sit at a table** (3–5 tables depending on your seats), order, eat there, pay and walk out. Each has an order bubble and a draining patience bar that starts once they sit down.
+- The dining room is a **real 3D scene** (three.js through react-three-fiber, low-poly): a back wall with windows and string lights, a plank floor and rug, wooden tables with chairs, and a pass counter with the kitchen behind it. Customers are 3D figures that walk in from the door, sit (two to a table, up to 6 seats), eat from a 3D plate, pay and walk out. The camera is orthographic and tilted, so the 2D layer (order bubbles, drop targets, coins, the cooking area) lines up exactly.
 - Cook on real stations: **jollof pot** and **egusi pot** (follow the recipe), **suya grill** (chicken / beef suya), **deep fryer** (dodo / puff-puff), **drink machine** (zobo / chapman), **eba**.
 - **Recipes are timed.** Open the 📜 recipe book (it also opens on its own the first time). Pots need the right ingredients from the shelf in the right order, and each one has a green timing window on the pot's bar: too early or too late costs quality, a wrong ingredient spoils the batch. Then simmer and tap the pot to stir, or it catches.
 - **Grill and fryer** have a timing bar (green = perfect, orange = risky, red = burns). Chicken and suya must be **flipped** halfway (tap the 🔄). Burnt food goes to the bin, and dumping a bad pot in the bin costs ₦50.
@@ -19,8 +19,9 @@ A **Cooking Fever-style** restaurant time-management game that travels across Ni
 - **Chef level**: good dishes earn XP. Each level widens the timing windows a little and adds a bit to tips.
 - **12 levels** with coin goals and **3 stars**. Fixed customer scripts, so you can practise and master each one.
 - **Owambe events** (levels 4, 8, 12): a bulk party order where you **cook for 15–30** (quantities scale with the guest count), **package** the right number of packs/coolers plus water, then pick a route for the **okada delivery**.
-- **Hired help** (My Buka → Hire help): a cleaner, waiter and cook who physically walk the kitchen lane and the aisles between tables. Wages are real money (₦1,200 / ₦2,500 / ₦4,000 a day at level 1). Workers earn experience by working and you pay to **train** them: faster walking, steadier hands (a low-skill cook misses timing windows), a higher wage. They also tire as the day goes on.
+- **Hired help** (My Buka → Hire help): up to 3 waiters, 2 cleaners and 2 cooks, each a named person who unlocks with total stars and has their own level and wage (₦1,200–₦4,400 a day at level 1). Waiters and cleaners walk the lane and aisles between tables, cooks work behind the counter. Workers earn experience by working and you pay to **train** them: faster walking, steadier hands (a low-skill cook misses timing windows), a higher wage. They also tire as the day goes on. Waiters and cleaners are 3D people who walk the lane in front of the tables and the gaps between them; waiters collect plates and drinks at the pass; cooks work behind it.
 - **Kitchen upgrades** (grill slots, pot portions, fryer speed and baskets, pour speed, extra plate) and **decor upgrades** (Ankara makeover, ceiling fans, Afrobeats speaker → more patience/tips). Coins, stars and upgrades are saved with AsyncStorage.
+- **Pause menu**: the pause button (or Esc, or switching tabs) freezes the clock, the customers, the staff, the cooking timers and the 3D room, and opens a menu with Resume, Restart, sound and music toggles, and Leave level (restart and leave both ask for a second tap).
 - Real drag and drop (react-native-gesture-handler + reanimated), haptics on device.
 - **Naija sound**: an original Afrobeats/highlife theme loop (talking drum, shekere, highlife guitar) under the menu, a softer mix plus a low market ambience during service, and buka sound effects. Music and sounds have separate on/off toggles on the home screen.
 
@@ -51,7 +52,8 @@ npx eas-cli build -p android --profile preview
 - `App.tsx`: screen flow (map → level intro → service → Owambe event → results) and persistence.
 - `src/v2/Service.tsx`: the restaurant round (customers, stations, plates, coins, combos, staff AI).
 - `src/v2/recipes.ts`: pot recipes, timing windows, quality scoring, pay and review text.
-- `src/v2/Dining.tsx`: floor plan (tables, aisles, kitchen lane), seated customers, staff sprites.
+- `src/v2/Dining.tsx`: seat and table plan, and the 2D overlays on the 3D seats (order bubble, drop target, coins, dirty plate), review chips, staff name tags.
+- `src/v2/world3d/`: the 3D dining room. `geom.ts` (projection between the 3D room and the stage), `Room.tsx` (floor, walls, furniture, pass counter), `Person.tsx` (low-poly people and their animations), `World3D.tsx` (scene, lights, customers, staff), `GLCanvas.web.tsx` / `GLCanvas.tsx` (web DOM canvas and native expo-gl).
 - `src/v2/CookUI.tsx`: timing bars, steam and the recipe book.
 - `src/v2/OwambeEvent.tsx`: bulk order: cook for N → package → okada delivery.
 - `src/v2/data2.ts`: menu, 12 levels, deterministic customer scripts, star goals, upgrades.

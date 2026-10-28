@@ -4,7 +4,9 @@ import Svg, { Rect, Circle, Path } from 'react-native-svg';
 import { SPR } from './assets';
 import { DECOR, type DecorUp } from './data2';
 import { Abs, GameBtn, GText, Panel, SW, SH, useS } from './stage';
-import { CHAIRS, DECO4, MAX_SEATS, MAX_STAFF_LV, SEAT_PRICES, STAFF, bukaLevel, chefLevel, chefTitle, ratingLabel, staffLvOf, staffSkill, staffSpeed, staffXpNeed, totalStars, trainCost, wageOf, wagesOf, type Deco4, type Save2, type StaffId } from './save2';
+import { CHAIRS, DECO4, MAX_SEATS, MAX_STAFF_LV, SEAT_PRICES, ROLE_INFO, WORKERS, WORKER_IDS, bukaLevel, chefLevel, chefTitle, ratingLabel, staffLvOf, staffSkill, staffSpeed, staffXpNeed, totalStars, trainCost, wageOf, wagesOf, type Deco4, type Save2 } from './save2';
+import { hiredWorkers } from './save2';
+import { planFor } from './Dining';
 import { play } from '../fx';
 
 type Tab = 'seats' | 'decor' | 'staff';
@@ -92,8 +94,8 @@ export default function MyBuka({ save, onSave, onBack, onMarket }: { save: Save2
               </Card>
             ))}
           </>)}
-          {tab === 'staff' && (Object.keys(STAFF) as StaffId[]).map((k) => {
-            const s = STAFF[k]; const hired = !!save.staff?.[k]; const locked = stars < s.stars;
+          {tab === 'staff' && WORKER_IDS.map((k) => {
+            const s = WORKERS[k]; const info = ROLE_INFO[s.role]; const hired = !!save.staff?.[k]; const locked = stars < s.stars;
             const lvl = staffLvOf(save, k); const xpNow = save.staffLv?.[k]?.xp ?? 0; const need = staffXpNeed(lvl);
             const maxed = lvl >= MAX_STAFF_LV; const ready = xpNow >= need; const cost = trainCost(lvl);
             const stats = `Speed x${staffSpeed(lvl).toFixed(2)} · Skill ${Math.round(staffSkill(lvl) * 100)}%`;
@@ -102,8 +104,8 @@ export default function MyBuka({ save, onSave, onBack, onMarket }: { save: Save2
               buy(cost, { staffLv: { ...(save.staffLv ?? {}), [k]: { lv: lvl + 1, xp: xpNow - need } } });
             };
             return (
-              <Card key={k} h={236} title={`${s.name} · Lv ${lvl}`} desc={`${s.job}\nWage ${naira(wageOf(save, k))} a day\n${stats}\n${maxed ? 'Fully trained' : `Experience ${Math.min(xpNow, need)}/${need} tasks`}`} testID={`card-staff-${k}`}
-                icon={<View style={{ alignItems: 'center' }}><Image source={SPR.staff[k]} style={{ width: S(60), height: S(76), opacity: locked ? 0.4 : 1 }} resizeMode="contain" /><View style={{ position: 'absolute', bottom: 0, backgroundColor: s.color, borderRadius: S(6), paddingHorizontal: S(4) }}><Text style={{ color: '#FFF', fontSize: S(9), fontWeight: '900' }}>{k.toUpperCase()}</Text></View></View>}>
+              <Card key={k} h={236} title={`${s.name} · Lv ${lvl}`} desc={`${info.label}: ${info.job}\nWage ${naira(wageOf(save, k))} a day\n${stats}\n${maxed ? 'Fully trained' : `Experience ${Math.min(xpNow, need)}/${need} tasks`}`} testID={`card-staff-${k}`}
+                icon={<View style={{ alignItems: 'center' }}><Image source={SPR.staff[s.role]} style={{ width: S(60), height: S(76), opacity: locked ? 0.4 : 1 }} resizeMode="contain" /><View style={{ position: 'absolute', bottom: 0, backgroundColor: info.color, borderRadius: S(6), paddingHorizontal: S(4) }}><Text style={{ color: '#FFF', fontSize: S(9), fontWeight: '900' }}>{info.label.toUpperCase()}</Text></View></View>}>
                 {locked ? <Text style={{ fontWeight: '900', color: '#A0522D', marginBottom: S(6) }}>{`🔒 Needs ${s.stars}⭐`}</Text>
                   : hired ? (<>
                     {!maxed && <GameBtn label={ready ? `Train ${naira(cost)}` : 'Needs experience'} color={ready ? 'blue' : 'grey'} disabled={!ready || save.coins < cost} w={128} h={30} size={11} testID={`train-${k}`} onPress={train} style={{ marginBottom: S(4) }} />}
@@ -136,6 +138,9 @@ export function ChairIcon({ tier, plus }: { tier: number; plus?: boolean }) {
 function BukaPreview({ save }: { save: Save2 }) {
   const S = useS();
   const seats = save.seats ?? 3;
+  const plan = planFor(seats);
+  const sx = 206 / 844;
+  const crew = hiredWorkers(save);
   const c = [['#E23B2E', '#B32418'], ['#9A6232', '#6E4220'], ['#C8283A', '#5A341A']][save.chair ?? 0];
   return (
     <Svg width={S(206)} height={S(170)} viewBox="0 0 206 170" style={{ marginTop: S(4) }}>
@@ -145,20 +150,18 @@ function BukaPreview({ save }: { save: Save2 }) {
       {save.deco?.tv && <><Rect x={140} y={34} width={52} height={32} rx={3} fill="#222" /><Rect x={144} y={38} width={44} height={24} fill="#3B8F3B" /><Circle cx={166} cy={50} r={3} fill="#FFF" /></>}
       {save.deco?.gen && <><Rect x={8} y={130} width={36} height={26} rx={4} fill="#E8A21E" /><Rect x={12} y={136} width={14} height={8} fill="#333" /></>}
       {save.decor.fans && <><Circle cx={100} cy={40} r={14} fill="#DDD" /><Path d="M 100 40 l 12 -6 M 100 40 l -12 -6 M 100 40 l 0 13" stroke="#888" strokeWidth={4} /></>}
-      <Rect x={10} y={96} width={186} height={18} rx={4} fill="#8A5A34" />
-      {Array.from({ length: seats }).map((_, i) => {
-        const x = 18 + i * (170 / seats);
-        return (
-          <React.Fragment key={i}>
-            <Rect x={x} y={70} width={24} height={26} rx={save.chair === 1 ? 2 : 7} fill={c[0]} />
-            <Rect x={x + 2} y={114} width={4} height={18} fill={c[1]} /><Rect x={x + 18} y={114} width={4} height={18} fill={c[1]} />
-          </React.Fragment>
-        );
-      })}
-      {(['cook', 'waiter', 'cleaner'] as StaffId[]).filter((k) => save.staff?.[k]).map((k, i) => (
+      {plan.tables.map((tb, ti) => (
+        <React.Fragment key={ti}>
+          {tb.seats.map((i) => <Rect key={i} x={plan.seatX[i] * sx - 9} y={60} width={18} height={24} rx={save.chair === 1 ? 2 : 6} fill={c[0]} />)}
+          <Rect x={(tb.cx - tb.w / 2) * sx} y={80} width={tb.w * sx} height={12} rx={3} fill="#8A5A34" />
+          <Rect x={(tb.cx - tb.w / 2) * sx + 4} y={92} width={4} height={14} fill={c[1]} /><Rect x={(tb.cx + tb.w / 2) * sx - 8} y={92} width={4} height={14} fill={c[1]} />
+        </React.Fragment>
+      ))}
+      <Rect x={10} y={122} width={186} height={12} rx={3} fill="#C9774A" />
+      {crew.map((k, i) => (
         <React.Fragment key={k}>
-          <Circle cx={60 + i * 44} cy={146} r={8} fill="#6B3E26" />
-          <Rect x={52 + i * 44} y={152} width={16} height={14} rx={4} fill={STAFF[k].color} />
+          <Circle cx={30 + i * 24} cy={WORKERS[k].role === 'cook' ? 148 : 112} r={7} fill="#6B3E26" />
+          <Rect x={23 + i * 24} y={WORKERS[k].role === 'cook' ? 153 : 117} width={14} height={WORKERS[k].role === 'cook' ? 12 : 6} rx={4} fill={ROLE_INFO[WORKERS[k].role].color} />
         </React.Fragment>
       ))}
     </Svg>

@@ -4,16 +4,19 @@ import Animated, { FadeIn, FadeOut, FadeOutUp, ZoomIn, useAnimatedStyle, useShar
 import { Draggable, DropZone, type Payload } from '../dnd';
 import { play, haptic } from '../fx';
 import { useNow } from '../ui';
-import { Abs, GText, SW, useS } from './stage';
+import { Abs, GText, Scaled, SW, useS } from './stage';
 import { SPR } from './assets';
 import { LEVELS2, MENU, scriptFor, stationsFor, goalsFor, type Comp, type Drink, type MenuId } from './data2';
 import type { Save2, StockKey } from './save2';
 import { LBL, STOCK_INFO, STOCK_OF, RUNNER_MUL } from './dests';
 import type { PrepResult } from './Prep';
-import { STAFF, chefLevel, chefWinMul, staffLvOf, staffSkill, staffSpeed, type StaffId } from './save2';
+import { WORKERS, chefLevel, chefWinMul, hiredWorkers, staffLvOf, staffSkill, staffSpeed, type StaffId, type WorkerId } from './save2';
 import { PlateView } from './PlateView';
-import { BL, DinerView, FL, KL, ReviewChip, StaffSprite, TableSet, WALK_IN, aislesFor, nearestAisle, tablesFor, useShake, type Cust } from './Dining';
+import { AISLE_Y, CANVAS_H, DinerOverlay, KL, LANE, ReviewChip, StaffTag, WALK_IN, planFor, seatSpots, useShake, type Cust } from './Dining';
+import { CHEF_X, PASS_STAND_X, STAGE_X, X_OF, Z_AISLE, kitchenZ, proj, yToZ } from './world3d/geom';
+import { World3D, staffPos, type CrewMember } from './world3d/World3D';
 import { CookBar, PotTimeBar, RecipeSheet, Steam } from './CookUI';
+import PauseMenu from './PauseMenu';
 import { ING, POT_RECIPES, batchStars, cookStars, freshPot, payMul, reviewText, scoreStep, starsText, tipMulQ, windowOf, timingState, type Ing, type PotId, type PotState } from './recipes';
 
 export { PlateView };
@@ -24,6 +27,11 @@ type FryItem = 'dodo' | 'puffpuff';
 type Slot<T> = { item: T | null; start: number; flipped?: boolean };
 
 const PLATE_X = [300, 382, 464, 546];
+// the 2D kitchen is shrunk and tucked under the 3D dining room
+const KS = 0.8; // kitchen scale
+const KOX = (SW - SW * KS) / 2; // kitchen left offset on the stage
+const KWT = 102; // kitchen top offset on the stage
+const PASS_PICK_X = STAGE_X(PASS_STAND_X); // waiters collect plates and drinks at the pass counter
 const SHELF_ORDER: Ing[] = ['oil', 'onion', 'blend', 'stock', 'rice', 'ugu'];
 const POT_X: Record<PotId, number> = { pot: 68, egusi: 186 };
 const WALK_SPEED = 150; // stage units per second for a level 1 worker
@@ -39,10 +47,13 @@ type Pt = { x: number; y: number };
 
 export type ServiceResult = {
   tips?: number; coins: number; served: number; lost: number; total: number; bestCombo: number; stock?: Record<StockKey, number>; runner?: number;
-  reviews?: { stars: number; text: string }[]; xp?: number; staff?: Partial<Record<StaffId, number>>; avgQ?: number;
+  reviews?: { stars: number; text: string }[]; xp?: number; staff?: Record<WorkerId, number>; avgQ?: number;
 };
 
-export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?: PrepResult | null; levelIdx: number; save: Save2; onEnd: (r: ServiceResult) => void; onQuit: () => void }) {
+export default function Service({ levelIdx, save, onEnd, onQuit, onRestart, sound, music, onToggleSound, onToggleMusic, prep }: {
+  prep?: PrepResult | null; levelIdx: number; save: Save2; onEnd: (r: ServiceResult) => void; onQuit: () => void; onRestart: () => void;
+  sound: boolean; music: boolean; onToggleSound: () => void; onToggleMusic: () => void;
+}) {
   const S = useS();
   const lv = LEVELS2[levelIdx];
   const st = useMemo(() => stationsFor(lv), [levelIdx]);
@@ -55,9 +66,9 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
   const fryFast = (up.fryer ?? 0) >= 1 ? 0.75 : 1;
   const pour = [2.4, 1.5, 0.9][up.drinks ?? 0] * (save.deco?.gen ? 0.7 : 1);
   const seats = Math.max(3, Math.min(5, save.seats ?? 4));
-  const TX = useMemo(() => tablesFor(seats), [seats]);
-  const AIS = useMemo(() => aislesFor(TX), [TX]);
-  const csc = seats >= 5 ? 0.56 : 0.62;
+  const plan = useMemo(() => planFor(seats), [seats]);
+  const TX = plan.seatX; // x of each seat
+  const AIS = plan.aisles;
   const plateN = 3 + (up.plates ?? 0);
   const rating = save.rating ?? 3.5;
   const chefXp = save.xp ?? 0;
@@ -74,8 +85,29 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
 
   const t0 = useRef(Date.now());
   const now = useNow(100);
-  const t = (now - t0.current) / 1000;
-  const tn = () => (Date.now() - t0.current) / 1000; // always-current time for callbacks that outlive a render
+  // pausing freezes game time: pauseAt is the moment of the pause and pausedTotal the time spent paused so far
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  const pauseAt = useRef<number | null>(null);
+  const pausedTotal = useRef(0);
+  const clock = (ms: number) => ((pauseAt.current ?? ms) - t0.current - pausedTotal.current) / 1000;
+  const t = clock(now);
+  const tn = () => clock(Date.now()); // always-current game time for callbacks that outlive a render
+  const setPause = (on: boolean) => {
+    if (on === pausedRef.current) return;
+    if (on) pauseAt.current = Date.now();
+    else { pausedTotal.current += Date.now() - (pauseAt.current ?? Date.now()); pauseAt.current = null; }
+    pausedRef.current = on; setPaused(on);
+  };
+  /** like setTimeout, but waits out a pause */
+  const later = (fn: () => void, ms: number) => { setTimeout(function run() { if (pausedRef.current) { setTimeout(run, 150); return; } fn(); }, ms); };
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setPause(!pausedRef.current); };
+    const vis = () => { if (document.hidden) setPause(true); };
+    window.addEventListener('keydown', key); document.addEventListener('visibilitychange', vis);
+    return () => { window.removeEventListener('keydown', key); document.removeEventListener('visibilitychange', vis); };
+  }, []);
   const [, force] = useState(0);
   const [sheet, setSheet] = useState(() => { const open = !SHEET_SEEN; SHEET_SEEN = true; return open; });
   const g = useRef({
@@ -104,9 +136,17 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
   });
   if (g.current.custs.length === 0) g.current.custs = Array.from({ length: seats }, () => null);
   const G = g.current;
-  const homeOf = (k: StaffId): Pt => (k === 'cook' ? { x: 88, y: KL } : k === 'waiter' ? { x: AIS[0], y: FL } : { x: AIS[AIS.length - 1], y: FL });
-  (Object.keys(STAFF) as StaffId[]).forEach((k) => {
-    if (save.staff?.[k] && !G.st[k]) {
+  const crew = hiredWorkers(save);
+  const roleOf = (w: WorkerId): StaffId => WORKERS[w].role;
+  /** where a worker waits when idle: cooks behind the counter, waiters at the left of the room, cleaners at the right */
+  const homeOf = (w: WorkerId): Pt => {
+    const role = roleOf(w); const n = crew.filter((x) => roleOf(x) === role).indexOf(w);
+    if (role === 'cook') return { x: 88 + n * 62, y: KL };
+    if (role === 'waiter') return { x: PASS_PICK_X - n * 60, y: LANE };
+    return { x: AIS[0] + n * 56, y: LANE };
+  };
+  crew.forEach((k) => {
+    if (!G.st[k]) {
       const h = homeOf(k);
       G.st[k] = { x: h.x, y: h.y, fx: h.x, fy: h.y, tx: h.x, ty: h.y, t0: 0, t1: 0, q: [], cur: null, phase: 'free', waitUntil: 0, did: false, holdUntil: 0, carry: null, face: 1, act: '', moving: false, tasks: 0 };
     }
@@ -117,8 +157,11 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
   const pop = (x: number, y: number, text: string, color = '#FFC93C') => {
     const id = ++popId.current;
     G.pops.push({ id, x, y, text, color });
-    setTimeout(() => { G.pops = G.pops.filter((p) => p.id !== id); rerender(); }, 1100);
+    later(() => { G.pops = G.pops.filter((p) => p.id !== id); rerender(); }, 1100);
   };
+  /** a pop-up at a spot in the (scaled) kitchen's own coordinates */
+  const kpop = (x: number, y: number, text: string, color?: string) => pop(KOX + x * KS, KWT + y * KS, text, color);
+  const headOf = (ci: number) => seatSpots(TX[ci]).head;
   const say = (text: string) => { G.msg = { text, id: Date.now() }; setTimeout(() => { if (G.msg && Date.now() - G.msg.id > 1300) { G.msg = null; rerender(); } }, 1400); };
   const shake = (key: string) => { G.shake[key] = (G.shake[key] ?? 0) + 1; };
   const addReview = (ci: number, stars: number) => {
@@ -126,12 +169,12 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     G.reviews.push({ stars, text });
     const id = ++popId.current;
     G.revPops.push({ id, x: TX[ci], stars, text });
-    setTimeout(() => { G.revPops = G.revPops.filter((r) => r.id !== id); rerender(); }, 3000);
+    later(() => { G.revPops = G.revPops.filter((r) => r.id !== id); rerender(); }, 3000);
   };
 
   // ---- tick ----
   useEffect(() => {
-    if (G.ended) return;
+    if (G.ended || pausedRef.current) return;
     // spawn
     const free = G.custs.findIndex((c) => c === null);
     if (free >= 0 && G.nextIdx < script.length && t >= script[G.nextIdx].at * gapMul) {
@@ -149,7 +192,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
         c.state = 'left'; c.leftAt = t; G.lost++; G.combo = 0;
         play('angry'); haptic.bad(); say('A customer left angry! 😤');
         addReview(i, 1);
-        setTimeout(() => { if (G.custs[i] === c) { G.custs[i] = null; rerender(); } }, 1700);
+        later(() => { if (G.custs[i] === c) { G.custs[i] = null; rerender(); } }, 1700);
       }
     });
     // pots: simmer, then the batch gets its quality
@@ -166,7 +209,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     G.fryer.forEach((s) => { if (!s.item) return; const e = (t - s.start) / fryFast; if (e >= COOK[s.item] + burnAfter && e < COOK[s.item] + burnAfter + 0.12 / fryFast) play('burnt'); });
     // eating -> pays (coins appear on the table)
     G.custs.forEach((c, i) => {
-      if (c && c.state === 'eating' && t >= c.eatUntil) { c.state = 'paid'; c.leftAt = t; const id = c.id; setTimeout(() => collect(i, id), 6000); }
+      if (c && c.state === 'eating' && t >= c.eatUntil) { c.state = 'paid'; c.leftAt = t; const id = c.id; later(() => collect(i, id), 6000); }
     });
     // morning prep: the cooler refills the pot instantly
     if (G.cooler > 0 && st.has('pot') && G.pot.portions <= 0 && !G.pot.cooking && G.pot.step === 0) {
@@ -178,8 +221,8 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     if (t >= lv.duration || allDone) {
       G.ended = true;
       G.custs.forEach((c) => { if (c && (c.state === 'paid' || c.state === 'eating')) { G.coins += c.coins + c.tip; G.tips += c.tip; } });
-      const staff: Partial<Record<StaffId, number>> = {};
-      (Object.keys(G.st) as StaffId[]).forEach((k) => { staff[k] = G.st[k].tasks; });
+      const staff: Record<WorkerId, number> = {};
+      Object.keys(G.st).forEach((k) => { staff[k] = G.st[k].tasks; });
       setTimeout(() => onEnd({
         coins: G.coins, served: G.served, lost: G.lost + G.custs.filter((c) => c && c.state === 'waiting').length + (script.length - G.nextIdx), total: script.length, bestCombo: G.bestCombo,
         tips: G.tips, stock: { ...G.stock }, runner: G.runner, reviews: G.reviews, xp: G.xp, staff, avgQ: G.qN ? G.qSum / G.qN : undefined,
@@ -240,12 +283,12 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
       // a ruined dish goes straight back
       c.arrived -= patBase * patienceMul * 0.22;
       shake('cust' + ci); play('angry'); haptic.bad(); say('Yuck! They sent it back 🤢');
-      pop(TX[ci] - 10, 56, '🤢', '#FF8A7A');
+      pop(headOf(ci).x - 10, headOf(ci).y - 34, '🤢', '#FF8A7A');
       return true;
     }
     c.items[idx].done = true; c.items[idx].q = q;
     play('pop'); haptic.drop();
-    pop(TX[ci] + 20, 56, '✓', '#7BE36A');
+    pop(headOf(ci).x + 16, headOf(ci).y - 34, '✓', '#7BE36A');
     G.xp += Math.max(0, Math.round(q) - 2);
     if (c.items.every((it) => it.done)) {
       const price = c.items.reduce((a, it) => a + MENU[it.m].price, 0);
@@ -271,11 +314,11 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     const c = G.custs[ci];
     if (!c || c.state !== 'paid' || (id != null && c.id !== id)) return;
     G.coins += c.coins + c.tip; G.tips += c.tip;
-    pop(TX[ci] - 20, 60, `+₦${(c.coins + c.tip).toLocaleString('en-US')}`);
+    pop(headOf(ci).x - 22, headOf(ci).y - 34, `+₦${(c.coins + c.tip).toLocaleString('en-US')}`);
     play('cash');
     c.state = 'leaving'; c.leftAt = tn();
     const cid = c.id;
-    setTimeout(() => { const cc = G.custs[ci]; if (cc && cc.id === cid && cc.state === 'leaving') { cc.state = 'dirty'; cc.leftAt = tn(); rerender(); } }, 1500);
+    later(() => { const cc = G.custs[ci]; if (cc && cc.id === cid && cc.state === 'leaving') { cc.state = 'dirty'; cc.leftAt = tn(); rerender(); } }, 1500);
     rerender();
   }
   function clearPlate(ci: number) {
@@ -286,38 +329,42 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
   const tapTray = () => { if (G.tray <= 0) return; const pi = plateFor('dodo'); if (pi < 0) { say('No free plate for that'); play('bad'); return; } if (addToPlate(pi, 'dodo', 4)) { G.tray--; rerender(); } };
 
   // ---- hired help: they walk the floor between the tables ----
-  const speedOf = (k: StaffId) => WALK_SPEED * staffSpeed(staffLvOf(save, k)) * energyOf(k);
-  function energyOf(k: StaffId) { return Math.max(0.62, 1 - 0.38 * (tn() / lv.duration) * (1 - 0.1 * (staffLvOf(save, k) - 1))); }
+  const speedOf = (k: WorkerId) => WALK_SPEED * staffSpeed(staffLvOf(save, k)) * energyOf(k);
+  function energyOf(k: WorkerId) { return Math.max(0.62, 1 - 0.38 * (tn() / lv.duration) * (1 - 0.1 * (staffLvOf(save, k) - 1))); }
   const posOf = (s: StaffRt): Pt => ({ x: s.x, y: s.y });
-  /** path between two spots: kitchen lane <-> aisles, and behind the tables from one aisle to another */
+  /** cooks stay on the kitchen lane; everyone else walks the lane in front of the tables, then up beside a table */
   const route = (from: Pt, to: Pt): Pt[] => {
-    const kf = from.y >= KL - 10; const kt = to.y >= KL - 10;
-    if (kf && kt) return [to];
-    if (kf && !kt) { const a = AIS[nearestAisle(AIS, to.x)]; return [{ x: a, y: KL }, { x: a, y: to.y }]; }
-    if (!kf && kt) return [{ x: from.x, y: KL }, to];
-    const a2 = AIS[nearestAisle(AIS, to.x)];
-    if (Math.abs(from.x - a2) < 4) return [{ x: a2, y: to.y }];
-    return [{ x: from.x, y: BL }, { x: a2, y: BL }, { x: a2, y: to.y }];
+    if (from.y >= KL - 10 && to.y >= KL - 10) return [to];
+    const pts: Pt[] = [];
+    if (Math.abs(from.y - LANE) > 1) pts.push({ x: from.x, y: LANE });
+    if (Math.abs(from.x - to.x) > 1) pts.push({ x: to.x, y: LANE });
+    pts.push(to);
+    return pts.filter((q, i) => i === pts.length - 1 || Math.hypot(q.x - (i ? pts[i - 1].x : from.x), q.y - (i ? pts[i - 1].y : from.y)) > 1);
   };
-  const leg = (from: Pt, to: Pt, extra: Partial<StepT> = {}): StepT[] => route(from, to).map((p, i, a) => (i === a.length - 1 ? { ...p, ...extra } : p));
-  const tableSpot = (ci: number, fromX: number): Pt => ({ x: Math.abs(AIS[ci] - fromX) <= Math.abs(AIS[ci + 1] - fromX) ? AIS[ci] : AIS[ci + 1], y: FL });
+  const leg = (from: Pt, to: Pt, extra: Partial<StepT> = {}): StepT[] => route(from, to).map((p, i, arr) => (i === arr.length - 1 ? { ...p, ...extra } : p));
+  /** the spot beside a table, in the aisle next to the customer in seat `ci` */
+  const tableSpot = (ci: number, fromX: number): Pt => {
+    const ti = plan.seatTable[ci]; const tb = plan.tables[ti]; const k2 = tb.seats.indexOf(ci);
+    const left = tb.seats.length === 2 ? k2 === 0 : Math.abs(tb.cx - tb.w / 2 - 30 - fromX) <= Math.abs(tb.cx + tb.w / 2 + 30 - fromX);
+    return { x: left ? tb.cx - tb.w / 2 - 30 : tb.cx + tb.w / 2 + 30, y: AISLE_Y };
+  };
   const plateX = (pi: number) => PLATE_X[pi] - (plateN === 4 ? 30 : 0) + 39;
   const shelfX = (ing: Ing) => 6 + (shelf.indexOf(ing) % 3) * 40 + 18;
   const grillX = (i: number) => 318 + i * (140 / grillN) + 140 / grillN / 2;
 
-  function startStep(k: StaffId, s: StaffRt, step: StepT) {
+  function startStep(k: WorkerId, s: StaffRt, step: StepT) {
     const now2 = tn();
     s.cur = step; s.fx = s.x; s.fy = s.y; s.tx = step.x; s.ty = step.y;
     s.t0 = now2; s.t1 = now2 + Math.hypot(s.tx - s.fx, s.ty - s.fy) / speedOf(k);
     s.phase = 'moving'; s.did = false;
     if (Math.abs(s.tx - s.fx) > 1) s.face = s.tx > s.fx ? 1 : -1;
   }
-  function nextStep(k: StaffId, s: StaffRt) {
+  function nextStep(k: WorkerId, s: StaffRt) {
     const step = s.q.shift();
     if (step) startStep(k, s, step); else { s.cur = null; s.phase = 'free'; s.act = ''; s.moving = false; }
   }
-  const assign = (k: StaffId, steps: StepT[]) => { const s = G.st[k]; s.q = steps; s.cur = null; s.phase = 'free'; nextStep(k, s); };
-  function advance(k: StaffId, s: StaffRt) {
+  const assign = (k: WorkerId, steps: StepT[]) => { const s = G.st[k]; s.q = steps; s.cur = null; s.phase = 'free'; nextStep(k, s); };
+  function advance(k: WorkerId, s: StaffRt) {
     const now2 = tn();
     for (let n = 0; n < 6; n++) {
       if (s.phase === 'moving') {
@@ -346,8 +393,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     }
   }
   function staffTick() {
-    (Object.keys(STAFF) as StaffId[]).forEach((k) => {
-      if (!save.staff?.[k]) return;
+    crew.forEach((k) => {
       const s = G.st[k]; if (!s) return;
       advance(k, s);
       if (!(s.phase === 'free' || s.cur?.idle)) return;
@@ -356,16 +402,17 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
       if (s.phase === 'free' && Math.hypot(s.x - home.x, s.y - home.y) > 2) assign(k, leg(posOf(s), home).map((p) => ({ ...p, idle: true })));
     });
   }
-  function think(k: StaffId, s: StaffRt): boolean {
+  function think(k: WorkerId, s: StaffRt): boolean {
     const from = posOf(s);
-    if (k === 'cleaner') {
+    const role = roleOf(k);
+    if (role === 'cleaner') {
       const i = G.custs.findIndex((c, ci) => c && c.state === 'dirty' && tn() - c.leftAt > 0.6 && !G.claim['c' + ci]);
       if (i < 0) return false;
       G.claim['c' + i] = true;
       assign(k, leg(from, tableSpot(i, s.x), { act: '🧽', wait: () => tn() + 0.9, hold: 0.2, fn: () => { clearPlate(i); s.tasks++; } }));
       return true;
     }
-    if (k === 'waiter') {
+    if (role === 'waiter') {
       const ci0 = G.custs.findIndex((c, ci) => c && c.state === 'paid' && tn() - c.leftAt > 0.8 && !G.claim['c' + ci]);
       if (ci0 >= 0) {
         const id = G.custs[ci0]!.id; G.claim['c' + ci0] = true;
@@ -379,7 +426,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
         if (ci < 0) continue;
         const id = G.custs[ci]!.id; G.claim['p' + pi] = true; G.claim['o' + ci] = true;
         let held: { comps: Comp[]; q: number | null; qm: Partial<Record<Comp, number>> } | null = null;
-        const pick: Pt = { x: plateX(pi), y: KL };
+        const pick: Pt = { x: PASS_PICK_X, y: LANE };
         assign(k, [
           ...leg(from, pick, { act: '🍽', hold: 0.3, carry: '🍽', fn: () => { if (G.plates[pi].length) { held = { comps: [...G.plates[pi]], q: plateAvg(pi), qm: { ...(G.plateQ[pi] ?? {}) } }; G.plates[pi] = []; rerender(); } } }),
           ...leg(pick, tableSpot(ci, pick.x), {
@@ -405,7 +452,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
         if (ci < 0) continue;
         const id = G.custs[ci]!.id; G.claim['u' + k2] = true; G.claim['o' + ci] = true;
         let held: Drink | null = null;
-        const pick: Pt = { x: 731 + k2 * 54, y: KL };
+        const pick: Pt = { x: PASS_PICK_X, y: LANE };
         assign(k, [
           ...leg(from, pick, { act: '🥤', hold: 0.3, carry: '🥤', fn: () => { if (G.cups[k2].item === d) { held = d; G.cups[k2] = { item: null, start: 0 }; rerender(); } } }),
           ...leg(pick, tableSpot(ci, pick.x), {
@@ -426,7 +473,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
       return false;
     }
     // cook: pots first (timed), then stirring, grill pickup, flipping and loading
-    const skill = staffSkill(staffLvOf(save, 'cook'));
+    const skill = staffSkill(staffLvOf(save, k));
     for (const which of pots) {
       const P = G[which]; const rec = POT_RECIPES[which];
       if (P.portions > 0 || P.cooking || P.step >= rec.steps.length || G.claim['k' + which] || (which === 'pot' && G.cooler > 0)) continue;
@@ -516,7 +563,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     G.stock[k] = Math.floor(it.pack / 2) - 1;
     G.runner += cost; G.coins = Math.max(0, G.coins - cost);
     say(`Out of ${it.name.toLowerCase()}! Errand boy bought more (−₦${cost.toLocaleString('en-US')})`);
-    pop(420, 250, `−₦${cost.toLocaleString('en-US')}`, '#FF8A7A');
+    kpop(420, 250, `−₦${cost.toLocaleString('en-US')}`, '#FF8A7A');
     return true;
   }
   // ---- drops ----
@@ -541,13 +588,13 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     const e = tn() - s.start;
     if (e >= COOK[s.item]) return;
     if (e < COOK[s.item] * 0.35) { say('Wait till it sizzles on one side'); return; }
-    s.flipped = true; play('plop'); pop(grillX(i) - 14, 230, '🔄', '#7BE36A'); rerender();
+    s.flipped = true; play('plop'); kpop(grillX(i) - 14, 230, '🔄', '#7BE36A'); rerender();
   }
   function stir(which: PotId) {
     const P = G[which]; const rec = POT_RECIPES[which];
     if (!P.cooking) return;
     if (P.stirs > rec.stirs) { say('That is enough stirring!'); return; }
-    P.stirs++; P.lastStir = tn(); play('plop'); pop(POT_X[which] - 8, 160, '🥄', '#FFF'); rerender();
+    P.stirs++; P.lastStir = tn(); play('plop'); kpop(POT_X[which] - 8, 160, '🥄', '#FFF'); rerender();
   }
   /** an ingredient goes into the pot: it has to be the right one, and the timing sets the quality */
   function potDrop(which: PotId, p: Payload) {
@@ -563,14 +610,14 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
     if (p.id !== step.ing) {
       P.scores.push(0.15); play('bad'); haptic.bad(); shake(which);
       say(`Wrong ingredient! The ${potTitle(which).toLowerCase()} suffers 😬`);
-      pop(px, 150, '✗', '#FF8A7A'); rerender(); return;
+      kpop(px, 150, '✗', '#FF8A7A'); rerender(); return;
     }
     const now2 = tn();
     const dt = P.step === 0 ? 0 : now2 - P.stepAt;
     P.scores.push(P.step === 0 ? 1 : scoreStep(dt, step, winMul));
     if (P.step > 0) {
       const ts = timingState(dt, step, winMul);
-      pop(px, 150, ts === 'perfect' ? 'Perfect!' : ts === 'early' ? 'Too early' : 'Too late', ts === 'perfect' ? '#7BE36A' : ts === 'early' ? '#FFC93C' : '#FF8A7A');
+      kpop(px, 150, ts === 'perfect' ? 'Perfect!' : ts === 'early' ? 'Too early' : 'Too late', ts === 'perfect' ? '#7BE36A' : ts === 'early' ? '#FFC93C' : '#FF8A7A');
     }
     P.step++; P.stepAt = now2; play('plop');
     if (P.step >= rec.steps.length) { P.cooking = true; P.cookStart = now2; play('sizzle'); }
@@ -619,7 +666,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
       if (G[which].portions <= 0) return;
       G[which] = freshPot(0);
     } else return;
-    G.coins = Math.max(0, G.coins - 50); play('plop'); pop(780, 300, '−₦50', '#FF8A7A'); rerender();
+    G.coins = Math.max(0, G.coins - 50); play('plop'); kpop(780, 300, '−₦50', '#FF8A7A'); rerender();
   }
 
   // ---- taps (Cooking Fever lets you tap too) ----
@@ -649,6 +696,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
   const tl = Math.max(0, lv.duration - t);
   const custCount = `${G.served + G.lost}/${script.length}`;
   const stars = goals.filter((x) => G.coins >= x).length;
+  const crew3d: CrewMember[] = crew.filter((k) => G.st[k]).map((k) => ({ id: k, role: roleOf(k), n: 0, rt: G.st[k] }));
   const hasGrill = st.has('grillChicken') || st.has('grillSuya');
   const hasFry = st.has('fryerDodo') || st.has('fryerPuff');
   const shelfSpr: Partial<Record<Ing, any>> = { blend: SPR.props.blend, rice: SPR.props.rice, ugu: SPR.props.ugu };
@@ -656,19 +704,27 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
 
   return (
     <View style={{ flex: 1 }}>
-      <Image source={SPR.bg[save.decor.ankara ? 1 : 0]} style={{ position: 'absolute', left: 0, top: S(-85), width: S(SW), height: S(475) }} resizeMode="cover" />
+      <World3D k={S(1)} plan={plan} custs={G.custs} crew={crew3d} chairTier={save.chair ?? 0} ankara={!!save.decor.ankara} now={tn} paused={paused} />
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: S(CANVAS_H), width: S(SW), height: S(390 - CANVAS_H), overflow: 'hidden' }}>
+        <Image source={SPR.bg[save.decor.ankara ? 1 : 0]} style={{ position: 'absolute', left: 0, top: S(-355 * 0.609), width: S(SW), height: S(475) }} resizeMode="stretch" />
+      </View>
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: S(CANVAS_H - 2), width: S(SW), height: S(4), backgroundColor: '#3A2010', opacity: 0.8 }} />
 
-      {/* dining room: chairs and tables, customers sit and eat here, staff walk the aisles */}
-      {TX.map((x, i) => <TableSet key={'tb' + i} cx={x} tier={save.chair ?? 0} />)}
+      {/* the 2D layer over the 3D seats: drop targets, order bubbles, coins, dirty plates */}
       {G.custs.map((c, i) => c && (
-        <DinerView key={c.id} c={c} cx={TX[i]} t={t} sc={csc} idx={i} tier={save.chair ?? 0} shakeN={G.shake['cust' + i] ?? 0} bubbleLeft={TX[i] > 700}
+        <DinerOverlay key={c.id} c={c} cx={TX[i]} t={t} idx={i} shakeN={G.shake['cust' + i] ?? 0} bubbleLeft={plan.bubbleLeft[i]}
           onDrop={(p) => onDropCust(i, p)} onCollect={() => collect(i)} onClear={() => clearPlate(i)} />
       ))}
-      {G.revPops.map((r) => <ReviewChip key={r.id} x={r.x} stars={r.stars} text={r.text} />)}
-      {(Object.keys(STAFF) as StaffId[]).filter((k) => save.staff?.[k] && G.st[k]).map((k) => {
-        const s = G.st[k];
-        return <StaffSprite key={k} id={k} x={s.x} y={s.y} face={s.face} moving={s.moving} carry={s.carry} act={s.act} energy={energyOf(k)} lv={staffLvOf(save, k)} />;
+      {G.revPops.map((r) => { const h = seatSpots(r.x).head; return <ReviewChip key={r.id} x={h.x} y={Math.max(38, h.y - 74)} stars={r.stars} text={r.text} />; })}
+      {crew.filter((k) => G.st[k]).map((k) => {
+        const rt = G.st[k]; const pos = staffPos(rt, tn()); const cook = roleOf(k) === 'cook';
+        const head = proj(cook ? CHEF_X : X_OF(pos.x), 2.05, cook ? kitchenZ(pos.x) : yToZ(pos.y));
+        return <StaffTag key={k} role={roleOf(k)} name={WORKERS[k].name.split(' ')[0]} lv={staffLvOf(save, k)} energy={energyOf(k)} act={rt.act} x={head.x} y={Math.max(38, head.y - 14)} />;
       })}
+
+      {/* kitchen: the 2D cooking area, shrunk to fit under the dining room */}
+      <View pointerEvents="box-none" style={{ position: 'absolute', left: S(KOX), top: S(KWT), width: S(SW * KS), height: S(390 * KS) }}>
+      <Scaled f={KS}>
       {G.cooler > 0 && st.has('pot') && (
         <Abs x={2} y={136} w={56} h={44} pointerEvents="none">
           <Image source={SPR.props.cooler} style={{ width: S(46), height: S(40) }} resizeMode="contain" />
@@ -790,8 +846,11 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
         </DropZone>
       </Abs>
 
+      </Scaled>
+      </View>
+
       {/* HUD */}
-      <Hud2 tl={tl} total={lv.duration} coins={G.coins} goals={goals} stars={stars} cust={custCount} name={`${levelIdx + 1}. ${lv.name}`} rating={rating} onSheet={() => setSheet((v) => !v)} onQuit={onQuit} />
+      <Hud2 tl={tl} total={lv.duration} coins={G.coins} goals={goals} stars={stars} cust={custCount} name={`${levelIdx + 1}. ${lv.name}`} rating={rating} onSheet={() => setSheet((v) => !v)} onPause={() => setPause(true)} />
       {sheet && <RecipeSheet pots={pots} hasGrill={hasGrill} hasFry={hasFry} titles={{ pot: potTitle('pot'), egusi: potTitle('egusi') }} onClose={() => setSheet(false)} />}
       {G.msg && (
         <Animated.View key={G.msg.id} entering={ZoomIn.duration(150)} exiting={FadeOut} pointerEvents="none" style={{ position: 'absolute', top: S(46), left: 0, right: 0, alignItems: 'center', zIndex: 650 }}>
@@ -803,6 +862,9 @@ export default function Service({ levelIdx, save, onEnd, onQuit, prep }: { prep?
           <GText size={20} color={p.color}>{p.text}</GText>
         </Animated.View>
       ))}
+      {paused && !G.ended && (
+        <PauseMenu level={`${levelIdx + 1}. ${lv.name}`} timeLeft={tl} coins={G.coins} sound={sound} music={music} onResume={() => setPause(false)} onRestart={onRestart} onQuit={onQuit} onToggleSound={onToggleSound} onToggleMusic={onToggleMusic} />
+      )}
       {G.ended && (
         <Animated.View entering={FadeIn} pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#0006', alignItems: 'center', justifyContent: 'center', zIndex: 800 }]}>
           <GText size={40}>{tl <= 0 ? "Time's up!" : 'All served!'}</GText>
@@ -918,7 +980,7 @@ function Plate({ x, y, comps, idx, q, shakeN, onDrop, onTap }: { x: number; y: n
   );
 }
 
-function Hud2({ tl, total, coins, goals, stars, cust, name, rating, onSheet, onQuit }: { tl: number; total: number; coins: number; goals: number[]; stars: number; cust: string; name: string; rating: number; onSheet: () => void; onQuit: () => void }) {
+function Hud2({ tl, total, coins, goals, stars, cust, name, rating, onSheet, onPause }: { tl: number; total: number; coins: number; goals: number[]; stars: number; cust: string; name: string; rating: number; onSheet: () => void; onPause: () => void }) {
   const S = useS();
   const frac = Math.min(1, coins / goals[2]);
   return (
@@ -947,7 +1009,7 @@ function Hud2({ tl, total, coins, goals, stars, cust, name, rating, onSheet, onQ
       <View testID="timer" style={{ backgroundColor: tl < 15 ? '#D7263D' : '#2FA544', borderRadius: S(14), borderWidth: S(2), borderColor: '#FFF', paddingHorizontal: S(10), height: S(28), justifyContent: 'center' }}>
         <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(14) }}>⏱ {Math.ceil(tl)}s</Text>
       </View>
-      <Draggable payload={{ kind: 'src', id: 'quit' }} enabled={false} onTap={onQuit} testID="quit" style={{ marginLeft: S(6), width: S(28), height: S(28), borderRadius: S(14), backgroundColor: '#D7263D', borderWidth: S(2), borderColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>
+      <Draggable payload={{ kind: 'src', id: 'pause' }} enabled={false} onTap={onPause} testID="pause" style={{ marginLeft: S(6), width: S(28), height: S(28), borderRadius: S(14), backgroundColor: '#1F5FB0', borderWidth: S(2), borderColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(13) }}>II</Text>
       </Draggable>
     </View>

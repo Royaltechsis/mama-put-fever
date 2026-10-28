@@ -11,6 +11,11 @@ export const MIN_PLAY_WIDTH = 600;
 
 const KCtx = createContext(1);
 export const useK = () => useContext(KCtx);
+/** shrinks or grows everything inside (positions and sizes both go through S()) without any CSS transform, so drag and drop still measures true */
+export function Scaled({ f, children }: { f: number; children: React.ReactNode }) {
+  const k = useK();
+  return <KCtx.Provider value={k * f}>{children}</KCtx.Provider>;
+}
 
 /** Fixed 844x390 logical stage, scaled to fit the screen (letterboxed). Children use S(n) for sizes. */
 export function Stage({ children }: { children: React.ReactNode }) {

@@ -83,7 +83,7 @@ export default function App() {
     }
     s.xp = (save.xp ?? 0) + (service.xp ?? 0);
     const sl = { ...(save.staffLv ?? {}) };
-    (Object.keys(service.staff ?? {}) as (keyof typeof sl)[]).forEach((k) => { sl[k] = { lv: sl[k]?.lv ?? 1, xp: (sl[k]?.xp ?? 0) + (service.staff?.[k] ?? 0) }; });
+    Object.keys(service.staff ?? {}).forEach((k) => { sl[k] = { lv: sl[k]?.lv ?? 1, xp: (sl[k]?.xp ?? 0) + (service.staff?.[k] ?? 0) }; });
     s.staffLv = sl;
     s.stars[idx] = Math.max(save.stars[idx] ?? 0, stars);
     s.best[idx] = Math.max(save.best[idx] ?? 0, total);
@@ -95,7 +95,6 @@ export default function App() {
   }
 
   const quit = () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && !window.confirm('Leave this level?')) return;
     setPh({ p: 'home' });
   };
   const buyKitchen = (k: keyof typeof KITCHEN) => { if (!save) return; const lvl = save.kitchen[k] ?? 0; const price = KITCHEN[k].prices[lvl]; if (price != null && save.coins >= price) persist({ ...save, coins: save.coins - price, kitchen: { ...save.kitchen, [k]: lvl + 1 } }); };
@@ -129,7 +128,8 @@ export default function App() {
     screen = <MyBuka save={save} onSave={persist} onBack={() => setPh({ p: back })} onMarket={() => setPh({ p: 'market', back: 'home' })} />;
   } else if (ph.p === 'service') {
     const idx = ph.idx;
-    screen = <Service key={ph.key} levelIdx={idx} save={save} prep={ph.prep} onQuit={quit}
+    screen = <Service key={ph.key} levelIdx={idx} save={save} prep={ph.prep} onQuit={quit} onRestart={() => setPh({ p: 'service', idx, key: Date.now(), prep: ph.prep })}
+      sound={save.sound} music={save.music} onToggleSound={toggleSound} onToggleMusic={toggleMusic}
       onEnd={(r) => (LEVELS2[idx].bulk ? setPh({ p: 'event', idx, service: r }) : finishLevel(idx, r, null))} />;
   } else if (ph.p === 'event') {
     const { idx, service } = ph;

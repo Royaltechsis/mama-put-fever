@@ -22,7 +22,7 @@ export type Save2 = {
   seats: number; // 3..5 seats at the counter
   chair: number; // 0 plastic, 1 wooden, 2 cushioned
   deco: Partial<Record<Deco4, boolean>>;
-  staff: Partial<Record<StaffId, boolean>>;
+  staff: Record<string, boolean>; // keyed by worker id, e.g. 'waiter2'
   prepSeen: boolean;
   acctNote?: boolean;
   day: number;
@@ -30,11 +30,12 @@ export type Save2 = {
   rating: number; // 1..5, average of recent customer reviews
   reviews: number; // reviews received so far
   xp: number; // chef experience
-  staffLv: Partial<Record<StaffId, StaffLv>>;
+  staffLv: Record<string, StaffLv>;
 };
 export type StaffLv = { lv: number; xp: number };
 export type Deco4 = 'gen' | 'tv' | 'canopy';
-export type StaffId = 'cleaner' | 'waiter' | 'cook';
+export type StaffId = 'cleaner' | 'waiter' | 'cook'; // roles
+export type WorkerId = string;
 const KEY_V2 = 'mamaput.save.v2';
 const KEY_V3 = 'mamaput.save.v3';
 const KEY = 'mamaput.save.v4';
@@ -47,8 +48,19 @@ export const DEFAULT_SAVE2: Save2 = {
 };
 const V4_DEFAULTS = { seats: 3, chair: 0, deco: {}, staff: {}, prepSeen: false, day: 1 };
 
+/** old saves hired one worker per role under the role name; those become the first worker of that role */
+function fixWorkers(s: Save2): Save2 {
+  const rename = (m: Record<string, any>) => {
+    const out: Record<string, any> = {};
+    Object.keys(m ?? {}).forEach((k) => { out[k === 'cook' || k === 'waiter' || k === 'cleaner' ? k + '1' : k] = m[k]; });
+    return out;
+  };
+  return { ...s, staff: rename(s.staff), staffLv: rename(s.staffLv) };
+}
+export const migrate = (old: any): Save2 => fixWorkers(migrateBase(old));
+
 /** v2 (one restaurant) -> v3 (destinations + market stock). The old v2 key is left untouched as a backup. */
-export function migrate(old: any): Save2 {
+function migrateBase(old: any): Save2 {
   if (!old || typeof old !== 'object') return { ...DEFAULT_SAVE2 };
   if (old.v === 4 && old.prog) {
     const s: Save2 = { ...DEFAULT_SAVE2, ...old, stock: { ...START_STOCK, ...(old.stock ?? {}) }, deco: old.deco ?? {}, staff: old.staff ?? {}, staffLv: old.staffLv ?? {} };
@@ -90,8 +102,8 @@ export async function writeSave2(s: Save2) {
 export const totalStars = (s: Save2) => Object.values(synced(s).prog).reduce((a, p) => a + p.stars.reduce((b, x) => b + (x ?? 0), 0), 0);
 
 // ---- v4 restaurant economy ----
-export const SEAT_PRICES: Record<number, number> = { 4: 1500, 5: 3500 };
-export const MAX_SEATS = 5;
+export const SEAT_PRICES: Record<number, number> = { 4: 1500, 5: 3500, 6: 6500 };
+export const MAX_SEATS = 6;
 export const CHAIRS = [
   { name: 'Plastic chairs', desc: 'Red and white, the classic', price: 0, tip: 1 },
   { name: 'Wooden benches', desc: 'Tips +10%', price: 2000, tip: 1.1 },
@@ -102,16 +114,29 @@ export const DECO4: Record<Deco4, { name: string; desc: string; price: number; i
   gen: { name: 'Generator', desc: 'No NEPA wahala: drinks pour faster', price: 2500, icon: '⚡' },
   tv: { name: 'TV (football on)', desc: 'Customers wait 15% longer', price: 3500, icon: '📺' },
 };
-export const STAFF: Record<StaffId, { name: string; job: string; wage: number; stars: number; who: number; color: string }> = {
-  cleaner: { name: 'Mama Nkechi', job: 'Cleaner: walks the tables and clears dirty plates', wage: 1200, stars: 2, who: 3, color: '#3FA7D6' },
-  waiter: { name: 'Tunde', job: 'Waiter: carries ready plates and drinks to the tables', wage: 2500, stars: 5, who: 1, color: '#E8453C' },
-  cook: { name: 'Iya Bisi', job: 'Cook: runs the pots and grill. Low skill means sloppy timing', wage: 4000, stars: 9, who: 0, color: '#F2A93B' },
+export type Worker = { role: StaffId; name: string; wage: number; stars: number };
+/** every worker you can hire; later ones unlock as your total stars grow */
+export const WORKERS: Record<WorkerId, Worker> = {
+  cleaner1: { role: 'cleaner', name: 'Mama Nkechi', wage: 1200, stars: 2 },
+  waiter1: { role: 'waiter', name: 'Tunde', wage: 2500, stars: 5 },
+  cook1: { role: 'cook', name: 'Iya Bisi', wage: 4000, stars: 9 },
+  cleaner2: { role: 'cleaner', name: 'Bola', wage: 1400, stars: 14 },
+  waiter2: { role: 'waiter', name: 'Segun', wage: 2800, stars: 16 },
+  cook2: { role: 'cook', name: 'Auntie Ngozi', wage: 4400, stars: 22 },
+  waiter3: { role: 'waiter', name: 'Kunle', wage: 3000, stars: 30 },
+};
+export const WORKER_IDS = Object.keys(WORKERS);
+export const ROLE_INFO: Record<StaffId, { label: string; job: string; color: string }> = {
+  cleaner: { label: 'Cleaner', job: 'Walks the tables and clears dirty plates', color: '#3FA7D6' },
+  waiter: { label: 'Waiter', job: 'Carries ready plates and drinks to the tables', color: '#E8453C' },
+  cook: { label: 'Cook', job: 'Runs the pots and grill. Low skill means sloppy timing', color: '#F2A93B' },
 };
 export const MAX_STAFF_LV = 5;
-export const staffLvOf = (s: Save2, k: StaffId) => s.staffLv?.[k]?.lv ?? 1;
+export const hiredWorkers = (s: Save2) => WORKER_IDS.filter((w) => s.staff?.[w]);
+export const staffLvOf = (s: Save2, w: WorkerId) => s.staffLv?.[w]?.lv ?? 1;
 /** wage goes up 30% of the base per training level */
-export const wageOf = (s: Save2, k: StaffId) => Math.round((STAFF[k].wage * (1 + 0.3 * (staffLvOf(s, k) - 1))) / 100) * 100;
-export const wagesOf = (s: Save2) => (Object.keys(STAFF) as StaffId[]).reduce((a, k) => a + (s.staff?.[k] ? wageOf(s, k) : 0), 0);
+export const wageOf = (s: Save2, w: WorkerId) => Math.round((WORKERS[w].wage * (1 + 0.3 * (staffLvOf(s, w) - 1))) / 100) * 100;
+export const wagesOf = (s: Save2) => hiredWorkers(s).reduce((a, w) => a + wageOf(s, w), 0);
 /** tasks a worker must complete before they are ready for the next training level */
 export const staffXpNeed = (lv: number) => 12 * lv;
 export const trainCost = (lv: number) => 2500 * lv;
@@ -127,6 +152,6 @@ export const chefWinMul = (xp: number) => 1 + 0.06 * (chefLevel(xp) - 1);
 export const ratingLabel = (r: number) => (r >= 4.5 ? 'Famous' : r >= 3.8 ? 'Well loved' : r >= 3 ? 'Decent' : r >= 2.2 ? 'Struggling' : 'Avoided');
 export function bukaLevel(s: Save2) {
   const deco = Object.values(s.deco ?? {}).filter(Boolean).length + Object.values(s.decor ?? {}).filter(Boolean).length;
-  const staff = Object.values(s.staff ?? {}).filter(Boolean).length;
+  const staff = hiredWorkers(s).length;
   return 1 + Math.max(0, (s.seats ?? 3) - 3) + (s.chair ?? 0) + deco + staff;
 }
