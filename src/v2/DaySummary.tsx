@@ -7,11 +7,13 @@ import { goalsFor } from './data2';
 import type { ServiceResult } from './Service';
 import type { EventResult } from './OwambeEvent';
 import { GameBtn, GText, Panel, SW, SH, useS } from './stage';
+import { chefLevel, chefTitle, ratingLabel } from './save2';
 
 const naira = (n: number) => `${n < 0 ? '−' : ''}₦${Math.abs(n).toLocaleString('en-US')}`;
 
-export default function DaySummary({ day, idx, ankara, service, event, stars, total, wages, staffCount, onNext, onRetry, onBuka, onMarket, onHome }: {
+export default function DaySummary({ day, idx, ankara, service, event, stars, total, wages, staffCount, rating = { from: 3.5, to: 3.5 }, xp = { from: 0, to: 0 }, onNext, onRetry, onBuka, onMarket, onHome }: {
   day: number; idx: number; ankara: boolean; service: ServiceResult; event: EventResult | null; stars: number; total: number; wages: number; staffCount: number;
+  rating?: { from: number; to: number }; xp?: { from: number; to: number };
   onNext: () => void; onRetry: () => void; onBuka: () => void; onMarket: () => void; onHome: () => void;
 }) {
   const S = useS();
@@ -21,6 +23,9 @@ export default function DaySummary({ day, idx, ankara, service, event, stars, to
   const owambe = event?.naira ?? 0;
   const profit = total - wages;
   const goals = goalsFor(idx);
+  const all = service.reviews ?? [];
+  const sorted = [...all].sort((a, b) => b.stars - a.stars);
+  const shown = sorted.length > 3 ? [sorted[0], sorted[1], sorted[sorted.length - 1]] : sorted;
   const Row = ({ l, v, c = '#5E3A1A', b }: { l: string; v: string; c?: string; b?: boolean }) => (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: S(300), paddingVertical: S(3), borderBottomWidth: b ? 0 : S(1), borderColor: '#E3C9A0' }}>
       <Text style={{ color: '#5E3A1A', fontSize: S(b ? 16 : 14), fontWeight: b ? '900' : '700' }}>{l}</Text>
@@ -32,10 +37,10 @@ export default function DaySummary({ day, idx, ankara, service, event, stars, to
       <Image source={SPR.bg[ankara ? 1 : 0]} style={{ position: 'absolute', left: 0, top: S(-85), width: S(SW), height: S(475) }} resizeMode="cover" />
       <View style={{ position: 'absolute', left: 0, top: 0, width: S(SW), height: S(SH), backgroundColor: '#1E120ACC' }} />
       <Animated.View entering={ZoomIn}>
-        <Panel w={640} h={360}>
-          <View style={{ flex: 1, padding: S(12), alignItems: 'center' }}>
-            <GText size={24} color="#FFC93C">{`Day ${day} done · closing time 🌙`}</GText>
-            <GText size={28} color="#FFC93C" style={{ marginTop: S(2) }}>{'★'.repeat(stars) + '☆'.repeat(3 - stars)}</GText>
+        <Panel w={640} h={376}>
+          <View style={{ flex: 1, padding: S(10), alignItems: 'center' }}>
+            <GText size={22} color="#FFC93C">{`Day ${day} done · closing time 🌙`}</GText>
+            <GText size={24} color="#FFC93C">{'★'.repeat(stars) + '☆'.repeat(3 - stars)}</GText>
             <View style={{ flexDirection: 'row', marginTop: S(4) }}>
               <View style={{ backgroundColor: '#FFF6E4', borderRadius: S(12), padding: S(10), alignItems: 'center' }}>
                 <Row l="Food sales" v={naira(sales)} />
@@ -54,13 +59,28 @@ export default function DaySummary({ day, idx, ankara, service, event, stars, to
                 {(service.runner ?? 0) > 0 && <Text style={{ color: '#5E3A1A', fontSize: S(13), fontWeight: '800', marginTop: S(4) }}>{`Errand boy restocks: ${service.runner}`}</Text>}
               </View>
             </View>
-            <View style={{ flexDirection: 'row', marginTop: S(12), gap: S(8) }}>
+            <View testID="sum-reviews" style={{ flexDirection: 'row', marginTop: S(6), width: S(512), backgroundColor: '#FFF6E4', borderRadius: S(12), borderWidth: S(2), borderColor: '#E3C9A0', padding: S(6) }}>
+              <View style={{ width: S(190) }}>
+                <Text style={{ color: '#3A2416', fontSize: S(13), fontWeight: '900' }}>{`⭐ ${rating.to.toFixed(1)}  ${ratingLabel(rating.to)}`}</Text>
+                <Text style={{ color: rating.to >= rating.from ? '#1E7A32' : '#B3261E', fontSize: S(11), fontWeight: '800' }}>{`${rating.to >= rating.from ? '▲' : '▼'} ${Math.abs(rating.to - rating.from).toFixed(2)} today${service.avgQ ? ` · food ${service.avgQ.toFixed(1)}★` : ''}`}</Text>
+                <Text style={{ color: '#5E3A1A', fontSize: S(11), fontWeight: '800', marginTop: S(2) }}>{`${chefTitle(chefLevel(xp.to))} · Lv ${chefLevel(xp.to)} (+${xp.to - xp.from} xp)${chefLevel(xp.to) > chefLevel(xp.from) ? ' LEVEL UP!' : ''}`}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: S(8) }}>
+                {all.length === 0 && <Text style={{ color: '#7A4A22', fontSize: S(11), fontWeight: '700' }}>No reviews today.</Text>}
+                {shown.map((r, i) => (
+                  <Text key={i} numberOfLines={1} style={{ color: '#3A2416', fontSize: S(10.5), fontWeight: '700' }}>
+                    <Text style={{ color: r.stars >= 4 ? '#2FA544' : r.stars === 3 ? '#C98A1B' : '#D7263D', fontWeight: '900' }}>{'★'.repeat(r.stars)}</Text>{` "${r.text}"`}
+                  </Text>
+                ))}
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', marginTop: S(8), gap: S(8) }}>
               <GameBtn label="🏠 My Buka" color="purple" w={130} h={44} size={14} testID="end-buka" onPress={onBuka} />
               <GameBtn label="🧺 Market" color="blue" w={110} h={44} size={14} testID="end-market" onPress={onMarket} />
               <GameBtn label="↻ Retry" color="orange" w={100} h={44} size={14} testID="end-retry" onPress={onRetry} />
               <GameBtn label={stars > 0 ? 'Next day ▶' : 'Try again ▶'} w={160} h={44} size={16} testID="end-next" onPress={stars > 0 ? onNext : onRetry} />
             </View>
-            <Text onPress={onHome} testID="end-home" style={{ color: '#7A4A22', fontSize: S(13), fontWeight: '800', marginTop: S(8), textDecorationLine: 'underline' }}>Back to the city</Text>
+            <Text onPress={onHome} testID="end-home" style={{ color: '#7A4A22', fontSize: S(13), fontWeight: '800', marginTop: S(5), textDecorationLine: 'underline' }}>Back to the city</Text>
           </View>
         </Panel>
       </Animated.View>

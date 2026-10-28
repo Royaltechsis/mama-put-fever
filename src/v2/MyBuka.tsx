@@ -4,7 +4,7 @@ import Svg, { Rect, Circle, Path } from 'react-native-svg';
 import { SPR } from './assets';
 import { DECOR, type DecorUp } from './data2';
 import { Abs, GameBtn, GText, Panel, SW, SH, useS } from './stage';
-import { CHAIRS, DECO4, MAX_SEATS, SEAT_PRICES, STAFF, bukaLevel, totalStars, wagesOf, type Deco4, type Save2, type StaffId } from './save2';
+import { CHAIRS, DECO4, MAX_SEATS, MAX_STAFF_LV, SEAT_PRICES, STAFF, bukaLevel, chefLevel, chefTitle, ratingLabel, staffLvOf, staffSkill, staffSpeed, staffXpNeed, totalStars, trainCost, wageOf, wagesOf, type Deco4, type Save2, type StaffId } from './save2';
 import { play } from '../fx';
 
 type Tab = 'seats' | 'decor' | 'staff';
@@ -16,8 +16,8 @@ export default function MyBuka({ save, onSave, onBack, onMarket }: { save: Save2
   const stars = totalStars(save);
   const seats = save.seats ?? 3;
   const buy = (price: number, change: Partial<Save2>) => { if (save.coins < price) { play('bad'); return; } play('cash'); onSave({ ...save, ...change, coins: save.coins - price }); };
-  const Card = ({ title, desc, children, icon, testID }: { title: string; desc: string; children?: React.ReactNode; icon: React.ReactNode; testID?: string }) => (
-    <View testID={testID} style={{ width: S(150), height: S(196), backgroundColor: '#FFF6E4', borderRadius: S(14), borderWidth: S(2), borderColor: '#C9934F', marginRight: S(10), padding: S(8), alignItems: 'center' }}>
+  const Card = ({ title, desc, children, icon, testID, h = 196 }: { title: string; desc: string; children?: React.ReactNode; icon: React.ReactNode; testID?: string; h?: number }) => (
+    <View testID={testID} style={{ width: S(150), height: S(h), backgroundColor: '#FFF6E4', borderRadius: S(14), borderWidth: S(2), borderColor: '#C9934F', marginRight: S(10), padding: S(8), alignItems: 'center' }}>
       <View style={{ height: S(70), justifyContent: 'center', alignItems: 'center' }}>{icon}</View>
       <Text style={{ fontWeight: '900', color: '#5E3A1A', fontSize: S(13), textAlign: 'center' }}>{title}</Text>
       <Text style={{ color: '#7A5A3A', fontSize: S(10), textAlign: 'center', marginTop: S(2), flex: 1 }}>{desc}</Text>
@@ -35,8 +35,7 @@ export default function MyBuka({ save, onSave, onBack, onMarket }: { save: Save2
           <GameBtn label="◀ Back" color="red" w={100} h={40} size={15} testID="buka-back" onPress={onBack} />
           <View style={{ alignItems: 'center' }}>
             <GText size={24} color="#FFC93C">{`My Buka · Level ${bukaLevel(save)}`}</GText>
-            <GText size={12}>{`${seats} seats · ${CHAIRS[save.chair ?? 0].name} · staff wages ${naira(wagesOf(save))}/day`}</GText>
-          </View>
+            <GText size={12}>{`${seats} seats · ${CHAIRS[save.chair ?? 0].name} · staff wages ${naira(wagesOf(save))}/day`}</GText>          </View>
           <View style={{ backgroundColor: '#2B1B12CC', borderRadius: S(12), paddingHorizontal: S(10), paddingVertical: S(5), alignItems: 'flex-end' }}>
             <GText size={17} color="#FFC93C">{naira(save.coins)}</GText>
             <GText size={11}>{`⭐ ${stars}`}</GText>
@@ -48,6 +47,8 @@ export default function MyBuka({ save, onSave, onBack, onMarket }: { save: Save2
         <Panel w={226} h={316}>
           <View style={{ flex: 1, padding: S(8), alignItems: 'center' }}>
             <GText size={14}>Your dining room</GText>
+            <GText size={11} color="#FFE9A8" style={{ textAlign: 'center' }}>{`⭐ ${(save.rating ?? 3.5).toFixed(1)} ${ratingLabel(save.rating ?? 3.5)}`}</GText>
+            <GText size={11} color="#FFE9A8" style={{ textAlign: 'center' }}>{`${chefTitle(chefLevel(save.xp ?? 0))} · Lv ${chefLevel(save.xp ?? 0)}`}</GText>
             <BukaPreview save={save} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: S(6) }}>
               {(Object.keys(DECO4) as Deco4[]).filter((k) => save.deco?.[k]).map((k) => <Text key={k} style={{ fontSize: S(18) }}>{DECO4[k].icon}</Text>)}
@@ -93,17 +94,27 @@ export default function MyBuka({ save, onSave, onBack, onMarket }: { save: Save2
           </>)}
           {tab === 'staff' && (Object.keys(STAFF) as StaffId[]).map((k) => {
             const s = STAFF[k]; const hired = !!save.staff?.[k]; const locked = stars < s.stars;
+            const lvl = staffLvOf(save, k); const xpNow = save.staffLv?.[k]?.xp ?? 0; const need = staffXpNeed(lvl);
+            const maxed = lvl >= MAX_STAFF_LV; const ready = xpNow >= need; const cost = trainCost(lvl);
+            const stats = `Speed x${staffSpeed(lvl).toFixed(2)} · Skill ${Math.round(staffSkill(lvl) * 100)}%`;
+            const train = () => {
+              if (maxed || !ready) return;
+              buy(cost, { staffLv: { ...(save.staffLv ?? {}), [k]: { lv: lvl + 1, xp: xpNow - need } } });
+            };
             return (
-              <Card key={k} title={`${s.name}`} desc={`${s.job}\nWage ${naira(s.wage)} a day`} testID={`card-staff-${k}`}
+              <Card key={k} h={236} title={`${s.name} · Lv ${lvl}`} desc={`${s.job}\nWage ${naira(wageOf(save, k))} a day\n${stats}\n${maxed ? 'Fully trained' : `Experience ${Math.min(xpNow, need)}/${need} tasks`}`} testID={`card-staff-${k}`}
                 icon={<View style={{ alignItems: 'center' }}><Image source={SPR.staff[k]} style={{ width: S(60), height: S(76), opacity: locked ? 0.4 : 1 }} resizeMode="contain" /><View style={{ position: 'absolute', bottom: 0, backgroundColor: s.color, borderRadius: S(6), paddingHorizontal: S(4) }}><Text style={{ color: '#FFF', fontSize: S(9), fontWeight: '900' }}>{k.toUpperCase()}</Text></View></View>}>
                 {locked ? <Text style={{ fontWeight: '900', color: '#A0522D', marginBottom: S(6) }}>{`🔒 Needs ${s.stars}⭐`}</Text>
-                  : hired ? <GameBtn label="Let go" color="red" w={110} h={32} size={12} testID={`fire-${k}`} onPress={() => onSave({ ...save, staff: { ...(save.staff ?? {}), [k]: false } })} />
+                  : hired ? (<>
+                    {!maxed && <GameBtn label={ready ? `Train ${naira(cost)}` : 'Needs experience'} color={ready ? 'blue' : 'grey'} disabled={!ready || save.coins < cost} w={128} h={30} size={11} testID={`train-${k}`} onPress={train} style={{ marginBottom: S(4) }} />}
+                    <GameBtn label="Let go" color="red" w={110} h={28} size={11} testID={`fire-${k}`} onPress={() => onSave({ ...save, staff: { ...(save.staff ?? {}), [k]: false } })} />
+                  </>)
                   : <GameBtn label="Hire" w={110} h={34} size={14} testID={`hire-${k}`} onPress={() => { play('cash'); onSave({ ...save, staff: { ...(save.staff ?? {}), [k]: true } }); }} />}
               </Card>
             );
           })}
         </ScrollView>
-        {tab === 'staff' && <GText size={11} style={{ marginTop: S(2) }}>Wages are paid at the end of each day from your takings. Hire now, pay tonight.</GText>}
+        {tab === 'staff' && <GText size={11} style={{ marginTop: S(2) }}>Wages come out of each day's takings. Staff earn experience by working, then you pay to train them: faster legs, steadier hands, higher wage.</GText>}
       </Abs>
     </View>
   );

@@ -8,13 +8,18 @@ A **Cooking Fever-style** restaurant time-management game that travels across Ni
 - **World map of Nigeria**: Lagos (jollof, chicken, suya, dodo), **Ibadan** (amala + ewedu + gbegiri, asun, fried beef; 8 levels, unlocks at 5⭐) and **Port Harcourt** (bole & fish with pepper sauce, catfish pepper soup, starch + banga, palm wine; 8 levels, unlocks at 12⭐). Enugu, Kano and Abuja are on the map as *coming soon*.
 - **Oja (market)**: stalls for pepper & tomato, rice/beans/flour, meat & fish, plantain/yam/greens and drinks. Every pot, grill item and drink uses stock; restock with ₦ (if you run out mid-shift the errand boy buys more at double price). Kitchen gear and decor are sold here too.
 - Saves migrate automatically from `mamaput.save.v2` to `mamaput.save.v3` (Lagos progress kept).
-- Customers queue at your counter (up to 4 at once), each with an order bubble and a draining patience bar.
-- Cook on real stations: **jollof pot** (refill it by dragging in tomato-pepper → rice), **suya grill** (chicken / beef suya), **deep fryer** (dodo / puff-puff), **drink machine** (zobo / chapman), **egusi pot + eba**.
-- Grill and fryer items go **raw → ready → burnt**. Drag burnt food to the bin.
-- Assemble **plates** (jollof + chicken, + dodo; eba + egusi; suya + yaji…) and drag them (or tap them) to the right customer.
-- Served customers leave **coins on the counter**. Tap to collect, which frees the spot for the next customer. Quick serves build **combos**, and happy customers tip more.
+- Customers **walk in, sit at a table** (3–5 tables depending on your seats), order, eat there, pay and walk out. Each has an order bubble and a draining patience bar that starts once they sit down.
+- Cook on real stations: **jollof pot** and **egusi pot** (follow the recipe), **suya grill** (chicken / beef suya), **deep fryer** (dodo / puff-puff), **drink machine** (zobo / chapman), **eba**.
+- **Recipes are timed.** Open the 📜 recipe book (it also opens on its own the first time). Pots need the right ingredients from the shelf in the right order, and each one has a green timing window on the pot's bar: too early or too late costs quality, a wrong ingredient spoils the batch. Then simmer and tap the pot to stir, or it catches.
+- **Grill and fryer** have a timing bar (green = perfect, orange = risky, red = burns). Chicken and suya must be **flipped** halfway (tap the 🔄). Burnt food goes to the bin, and dumping a bad pot in the bin costs ₦50.
+- Everything is scored **1–5★**, and the plate shows the average. A ruined 1★ dish is sent back, ★★ pays 55% with no tip, ★★★ 75%, ★★★★ 90%, ★★★★★ pays full with a bigger tip.
+- Assemble **plates** (jollof + chicken, + dodo; eba + egusi; suya + yaji…) and drag them (or tap them) to the right table.
+- Every customer leaves a **review** from the food quality and how long they waited. Your buka's **⭐ rating** carries over between days: a good rating brings more customers, longer patience and bigger tips, a bad one the opposite.
+- Served customers leave **coins on the table**. Tap to collect, then tap the dirty plate to clear the table (a hired waiter and cleaner do both). Quick serves build **combos**.
+- **Chef level**: good dishes earn XP. Each level widens the timing windows a little and adds a bit to tips.
 - **12 levels** with coin goals and **3 stars**. Fixed customer scripts, so you can practise and master each one.
 - **Owambe events** (levels 4, 8, 12): a bulk party order where you **cook for 15–30** (quantities scale with the guest count), **package** the right number of packs/coolers plus water, then pick a route for the **okada delivery**.
+- **Hired help** (My Buka → Hire help): a cleaner, waiter and cook who physically walk the kitchen lane and the aisles between tables. Wages are real money (₦1,200 / ₦2,500 / ₦4,000 a day at level 1). Workers earn experience by working and you pay to **train** them: faster walking, steadier hands (a low-skill cook misses timing windows), a higher wage. They also tire as the day goes on.
 - **Kitchen upgrades** (grill slots, pot portions, fryer speed and baskets, pour speed, extra plate) and **decor upgrades** (Ankara makeover, ceiling fans, Afrobeats speaker → more patience/tips). Coins, stars and upgrades are saved with AsyncStorage.
 - Real drag and drop (react-native-gesture-handler + reanimated), haptics on device.
 - **Naija sound**: an original Afrobeats/highlife theme loop (talking drum, shekere, highlife guitar) under the menu, a softer mix plus a low market ambience during service, and buka sound effects. Music and sounds have separate on/off toggles on the home screen.
@@ -44,11 +49,14 @@ npx eas-cli build -p android --profile preview
 
 ## Code map
 - `App.tsx`: screen flow (map → level intro → service → Owambe event → results) and persistence.
-- `src/v2/Service.tsx`: the restaurant round (customers, stations, plates, coins, combos).
+- `src/v2/Service.tsx`: the restaurant round (customers, stations, plates, coins, combos, staff AI).
+- `src/v2/recipes.ts`: pot recipes, timing windows, quality scoring, pay and review text.
+- `src/v2/Dining.tsx`: floor plan (tables, aisles, kitchen lane), seated customers, staff sprites.
+- `src/v2/CookUI.tsx`: timing bars, steam and the recipe book.
 - `src/v2/OwambeEvent.tsx`: bulk order: cook for N → package → okada delivery.
 - `src/v2/data2.ts`: menu, 12 levels, deterministic customer scripts, star goals, upgrades.
 - `src/v2/Home2.tsx`, `src/v2/LevelCards.tsx`: map, shops, intro and results cards.
-- `src/v2/stage.tsx`: fixed 844×390 landscape stage scaled to any screen, plus a rotate-your-phone hint in portrait.
+- `src/v2/stage.tsx`: fixed 844×390 landscape stage scaled to any screen, plus a rotate-your-phone hint when the window is narrower than `MIN_PLAY_WIDTH` (square tablets and portrait laptops just letterbox).
 - `src/dnd.tsx`: drag-and-drop layer (ghost, drop zones, tap fallback).
 - `assets/v2/`: generated cartoon art (restaurant, appliances, food, customers) as webp sprites.
 

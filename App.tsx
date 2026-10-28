@@ -33,7 +33,7 @@ type Phase =
   | { p: 'buka'; back: 'map' | 'home' }
   | { p: 'service'; idx: number; key: number; prep?: PrepResult | null }
   | { p: 'event'; idx: number; service: ServiceResult }
-  | { p: 'end'; idx: number; service: ServiceResult; event: EventResult | null; stars: number; total: number; wages: number; day: number };
+  | { p: 'end'; idx: number; service: ServiceResult; event: EventResult | null; stars: number; total: number; wages: number; day: number; rating: { from: number; to: number }; xp: { from: number; to: number } };
 
 export default function App() {
   const [save, setSave] = useState<Save2 | null>(null);
@@ -73,13 +73,25 @@ export default function App() {
     const wages = wagesOf(save);
     s.coins = Math.max(0, save.coins + total - wages);
     s.day = (save.day ?? 1) + 1;
+    // reputation: today's reviews pull the buka's rating toward them (new places swing faster)
+    const rv = service.reviews ?? [];
+    const oldRating = save.rating ?? 3.5;
+    if (rv.length) {
+      const w = Math.max(3, Math.min(save.reviews ?? 0, 15));
+      s.rating = Math.max(1, Math.min(5, (oldRating * w + rv.reduce((a, r) => a + r.stars, 0)) / (w + rv.length)));
+      s.reviews = (save.reviews ?? 0) + rv.length;
+    }
+    s.xp = (save.xp ?? 0) + (service.xp ?? 0);
+    const sl = { ...(save.staffLv ?? {}) };
+    (Object.keys(service.staff ?? {}) as (keyof typeof sl)[]).forEach((k) => { sl[k] = { lv: sl[k]?.lv ?? 1, xp: (sl[k]?.xp ?? 0) + (service.staff?.[k] ?? 0) }; });
+    s.staffLv = sl;
     s.stars[idx] = Math.max(save.stars[idx] ?? 0, stars);
     s.best[idx] = Math.max(save.best[idx] ?? 0, total);
     if (stars > 0 && idx + 1 > save.unlocked && idx + 1 < LEVELS2.length) s.unlocked = idx + 1;
     for (let i = 0; i < LEVELS2.length; i++) if (s.stars[i] == null) s.stars[i] = 0;
     persist(s);
     if (user) putSave(synced(s)); // keep the account copy in step at the end of each day
-    setPh({ p: 'end', idx, service, event, stars, total, wages, day: save.day ?? 1 });
+    setPh({ p: 'end', idx, service, event, stars, total, wages, day: save.day ?? 1, rating: { from: oldRating, to: s.rating ?? oldRating }, xp: { from: save.xp ?? 0, to: s.xp } });
   }
 
   const quit = () => {
@@ -124,7 +136,7 @@ export default function App() {
     screen = <OwambeEvent bulk={LEVELS2[idx].bulk!} bigPot={(save.kitchen.pot ?? 0) >= 1} onDone={(e) => finishLevel(idx, service, e)} />;
   } else if (ph.p === 'end') {
     const { idx } = ph;
-    screen = <DaySummary day={ph.day} idx={idx} ankara={!!save.decor.ankara} service={ph.service} event={ph.event} stars={ph.stars} total={ph.total} wages={ph.wages}
+    screen = <DaySummary day={ph.day} idx={idx} ankara={!!save.decor.ankara} service={ph.service} event={ph.event} stars={ph.stars} total={ph.total} wages={ph.wages} rating={ph.rating} xp={ph.xp}
       staffCount={Object.values(save.staff ?? {}).filter(Boolean).length}
       onHome={() => setPh({ p: 'home' })} onBuka={() => setPh({ p: 'buka', back: 'home' })} onMarket={() => setPh({ p: 'market', back: 'home' })}
       onRetry={() => setPh({ p: 'intro', idx })} onNext={() => setPh({ p: 'intro', idx: Math.min(idx + 1, LEVELS2.length - 1) })} />;

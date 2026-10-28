@@ -26,7 +26,13 @@ export type Save2 = {
   prepSeen: boolean;
   acctNote?: boolean;
   day: number;
+  // v5: reputation, chef progression, staff training
+  rating: number; // 1..5, average of recent customer reviews
+  reviews: number; // reviews received so far
+  xp: number; // chef experience
+  staffLv: Partial<Record<StaffId, StaffLv>>;
 };
+export type StaffLv = { lv: number; xp: number };
 export type Deco4 = 'gen' | 'tv' | 'canopy';
 export type StaffId = 'cleaner' | 'waiter' | 'cook';
 const KEY_V2 = 'mamaput.save.v2';
@@ -37,6 +43,7 @@ export const DEFAULT_SAVE2: Save2 = {
   v: 4, coins: 0, unlocked: 0, stars: [], best: [], dest: 'lagos', prog: { lagos: { unlocked: 0, stars: [], best: [] } },
   stock: { ...START_STOCK }, kitchen: {}, decor: {}, sound: true, music: true,
   seats: 3, chair: 0, deco: {}, staff: {}, prepSeen: false, day: 1,
+  rating: 3.5, reviews: 0, xp: 0, staffLv: {},
 };
 const V4_DEFAULTS = { seats: 3, chair: 0, deco: {}, staff: {}, prepSeen: false, day: 1 };
 
@@ -44,7 +51,7 @@ const V4_DEFAULTS = { seats: 3, chair: 0, deco: {}, staff: {}, prepSeen: false, 
 export function migrate(old: any): Save2 {
   if (!old || typeof old !== 'object') return { ...DEFAULT_SAVE2 };
   if (old.v === 4 && old.prog) {
-    const s: Save2 = { ...DEFAULT_SAVE2, ...old, stock: { ...START_STOCK, ...(old.stock ?? {}) }, deco: old.deco ?? {}, staff: old.staff ?? {} };
+    const s: Save2 = { ...DEFAULT_SAVE2, ...old, stock: { ...START_STOCK, ...(old.stock ?? {}) }, deco: old.deco ?? {}, staff: old.staff ?? {}, staffLv: old.staffLv ?? {} };
     const p = s.prog[s.dest] ?? { unlocked: 0, stars: [], best: [] };
     return { ...s, unlocked: p.unlocked, stars: p.stars, best: p.best };
   }
@@ -96,11 +103,28 @@ export const DECO4: Record<Deco4, { name: string; desc: string; price: number; i
   tv: { name: 'TV (football on)', desc: 'Customers wait 15% longer', price: 3500, icon: '📺' },
 };
 export const STAFF: Record<StaffId, { name: string; job: string; wage: number; stars: number; who: number; color: string }> = {
-  cleaner: { name: 'Mama Nkechi', job: 'Cleaner: clears dirty plates', wage: 150, stars: 2, who: 3, color: '#3FA7D6' },
-  waiter: { name: 'Tunde', job: 'Waiter: carries ready plates and drinks to customers', wage: 300, stars: 5, who: 1, color: '#E8453C' },
-  cook: { name: 'Iya Bisi', job: 'Cook: keeps the pot and grill going', wage: 450, stars: 9, who: 0, color: '#F2A93B' },
+  cleaner: { name: 'Mama Nkechi', job: 'Cleaner: walks the tables and clears dirty plates', wage: 1200, stars: 2, who: 3, color: '#3FA7D6' },
+  waiter: { name: 'Tunde', job: 'Waiter: carries ready plates and drinks to the tables', wage: 2500, stars: 5, who: 1, color: '#E8453C' },
+  cook: { name: 'Iya Bisi', job: 'Cook: runs the pots and grill. Low skill means sloppy timing', wage: 4000, stars: 9, who: 0, color: '#F2A93B' },
 };
-export const wagesOf = (s: Save2) => (Object.keys(STAFF) as StaffId[]).reduce((a, k) => a + (s.staff?.[k] ? STAFF[k].wage : 0), 0);
+export const MAX_STAFF_LV = 5;
+export const staffLvOf = (s: Save2, k: StaffId) => s.staffLv?.[k]?.lv ?? 1;
+/** wage goes up 30% of the base per training level */
+export const wageOf = (s: Save2, k: StaffId) => Math.round((STAFF[k].wage * (1 + 0.3 * (staffLvOf(s, k) - 1))) / 100) * 100;
+export const wagesOf = (s: Save2) => (Object.keys(STAFF) as StaffId[]).reduce((a, k) => a + (s.staff?.[k] ? wageOf(s, k) : 0), 0);
+/** tasks a worker must complete before they are ready for the next training level */
+export const staffXpNeed = (lv: number) => 12 * lv;
+export const trainCost = (lv: number) => 2500 * lv;
+export const staffSpeed = (lv: number) => 1 + 0.18 * (lv - 1); // walking speed multiplier
+export const staffSkill = (lv: number) => Math.min(0.95, 0.45 + 0.12 * (lv - 1)); // 0..1 chance-ish quality
+
+// ---- chef progression ----
+export const chefLevel = (xp: number) => Math.min(10, 1 + Math.floor(Math.sqrt(Math.max(0, xp) / 60)));
+export const chefXpFor = (lv: number) => (lv - 1) * (lv - 1) * 60;
+export const chefTitle = (lv: number) => (lv <= 2 ? 'Rookie cook' : lv <= 4 ? 'Line cook' : lv <= 6 ? 'Buka boss' : lv <= 8 ? 'Master chef' : 'Mama Put legend');
+/** timing windows get this much wider per chef level */
+export const chefWinMul = (xp: number) => 1 + 0.06 * (chefLevel(xp) - 1);
+export const ratingLabel = (r: number) => (r >= 4.5 ? 'Famous' : r >= 3.8 ? 'Well loved' : r >= 3 ? 'Decent' : r >= 2.2 ? 'Struggling' : 'Avoided');
 export function bukaLevel(s: Save2) {
   const deco = Object.values(s.deco ?? {}).filter(Boolean).length + Object.values(s.decor ?? {}).filter(Boolean).length;
   const staff = Object.values(s.staff ?? {}).filter(Boolean).length;

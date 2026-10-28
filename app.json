@@ -3,7 +3,7 @@
     "name": "Mamaput",
     "slug": "mama-put-fever",
     "version": "2.0.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,

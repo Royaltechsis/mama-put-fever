@@ -5,15 +5,18 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 export const SW = 844;
 export const SH = 390;
 
+/** Below this window width the stage gets too small to tap, so we ask for landscape. Shape doesn't matter:
+ *  square tablets and portrait laptops/2-in-1s are wide enough and just letterbox. */
+export const MIN_PLAY_WIDTH = 600;
+
 const KCtx = createContext(1);
 export const useK = () => useContext(KCtx);
 
 /** Fixed 844x390 logical stage, scaled to fit the screen (letterboxed). Children use S(n) for sizes. */
 export function Stage({ children }: { children: React.ReactNode }) {
   const { width, height } = useWindowDimensions();
-  const portrait = height > width * 1.1;
   const k = Math.min(width / SW, height / SH);
-  if (portrait) return <RotateHint />;
+  if (width < MIN_PLAY_WIDTH) return <RotateHint />;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1E120A' }}>
       <KCtx.Provider value={k}>
