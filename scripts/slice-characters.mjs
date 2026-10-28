@@ -37,17 +37,22 @@ function keyOut(img) {
   const bg = [med(0), med(1), med(2)];
   const dist = (p) => Math.hypot(data[p * 4] - bg[0], data[p * 4 + 1] - bg[1], data[p * 4 + 2] - bg[2]);
   const isBg = new Uint8Array(w * h);
+  // A bright pure green is far from anything people wear, so it can be keyed loosely. A duller green (what image tools
+  // sometimes give instead) is close to green clothes, so it is keyed tightly and only exact background is cleared from gaps.
+  const pure = bg[1] > 200 && bg[0] < 90 && bg[2] < 90;
+  const tol = pure ? 110 : 55;
   // flood fill from the edges through anything close to the background colour
   const q = new Int32Array(w * h); let qh = 0; let qt = 0;
-  for (const p of border) if (!isBg[p] && dist(p) < 110) { isBg[p] = 1; q[qt++] = p; }
+  for (const p of border) if (!isBg[p] && dist(p) < tol) { isBg[p] = 1; q[qt++] = p; }
   while (qh < qt) {
     const p = q[qh++]; const x = p % w; const y = (p / w) | 0;
     for (const n of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1]) {
-      if (n >= 0 && !isBg[n] && dist(n) < 110) { isBg[n] = 1; q[qt++] = n; }
+      if (n >= 0 && !isBg[n] && dist(n) < tol) { isBg[n] = 1; q[qt++] = n; }
     }
   }
   // enclosed gaps (between an arm and the body) are not reached from the edge: drop pixels that are almost exactly the background
-  for (let p = 0; p < w * h; p++) if (!isBg[p] && dist(p) < 45) isBg[p] = 1;
+  const gap = pure ? 45 : 26;
+  for (let p = 0; p < w * h; p++) if (!isBg[p] && dist(p) < gap) isBg[p] = 1;
   for (let p = 0; p < w * h; p++) {
     if (isBg[p]) { data[p * 4] = 40; data[p * 4 + 1] = 30; data[p * 4 + 2] = 25; data[p * 4 + 3] = 0; continue; }
     // pull the background tint off the outline
@@ -99,7 +104,8 @@ function cells(isBg, w, h) {
   const top = figuresInRow(isBg, w, 0, mid);
   const bottom = figuresInRow(isBg, w, mid, h);
   const walk = top.length ? [0, 1, 2, 3].map((i) => top[Math.floor((i * top.length) / 4)]) : [null, null, null, null];
-  const rest = [0, 1, 2, 3].map((i) => bottom[i] ?? null);
+  // more than 4 on the bottom (an extra eating pose): keep stand, sit, the first eat and the last one (chewing)
+  const rest = bottom.length > 4 ? [bottom[0], bottom[1], bottom[2], bottom[bottom.length - 1]] : [0, 1, 2, 3].map((i) => bottom[i] ?? null);
   return { boxes: [...walk, ...rest], found: `${top.length} top, ${bottom.length} bottom` };
 }
 
