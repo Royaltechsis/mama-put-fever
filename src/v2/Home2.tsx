@@ -23,19 +23,18 @@ export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuka, onB
     <View style={{ flex: 1 }}>
       <Image source={SPR.bg[save.decor.ankara ? 1 : 0]} style={{ position: 'absolute', width: S(SW), height: S(390) }} resizeMode="cover" />
       <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#1A0E0670' }} />
-      {/* title */}
-      <Abs x={14} y={14} w={270} h={200}>
-        <GText size={50} color="#FFC93C" stroke="#7E1020">MAMAPUT</GText>
-        <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(14), marginTop: S(2) }}>{dest.place}</Text>
-        <Text style={{ color: '#FFE7B0', fontWeight: '800', fontSize: S(11), marginTop: S(1) }}>{dest.name}, {dest.state} 🇳🇬 · {dest.tagline}</Text>
-        <View style={{ flexDirection: 'row', marginTop: S(8), alignItems: 'flex-end' }}>
+      {/* left column: title on top, buttons pinned to the bottom, the picture takes whatever room is left (and is
+          clipped rather than pushed under the buttons) */}
+      <Abs x={14} y={12} w={262} h={370} style={{ flexDirection: 'column' }}>
+        <GText size={36} color="#FFC93C" stroke="#7E1020">MAMAPUT</GText>
+        <Text numberOfLines={1} style={{ color: '#FFF', fontWeight: '900', fontSize: S(14), marginTop: S(2), textShadowColor: '#000', textShadowRadius: S(3) }}>{dest.place}</Text>
+        <Text numberOfLines={2} style={{ color: '#FFE7B0', fontWeight: '800', fontSize: S(11), marginTop: S(1), textShadowColor: '#000', textShadowRadius: S(3) }}>{dest.name}, {dest.state} 🇳🇬 · {dest.tagline}</Text>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', overflow: 'hidden', paddingBottom: S(6) }}>
           <Image source={SPR.cust[0]} style={{ width: S(70), height: S(86) }} resizeMode="contain" />
           <Image source={SPR.food.jollof} style={{ width: S(60), height: S(50) }} resizeMode="contain" />
           <Image source={SPR.food.chicken} style={{ width: S(50), height: S(46) }} resizeMode="contain" />
           <Image source={SPR.props.zobo} style={{ width: S(30), height: S(50) }} resizeMode="contain" />
         </View>
-      </Abs>
-      <Abs x={14} y={224} w={270} h={160}>
         <GameBtn label="▶ PLAY" testID="play" w={240} h={54} size={24} onPress={() => onPlay(Math.min(save.unlocked, LEVELS2.length - 1))} />
         <View style={{ flexDirection: 'row', marginTop: S(8) }}>
           <GameBtn label="🗺 Map" testID="to-map" color="purple" w={84} h={42} size={13} onPress={onMap} />

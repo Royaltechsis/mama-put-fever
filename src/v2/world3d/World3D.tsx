@@ -9,6 +9,7 @@ import { SPR } from '../assets';
 import { CUST_LOOKS, STAFF_LOOKS, type Carry, type PoseOut } from './Person';
 import { Room } from './Room';
 import { BODY, BUST, SpritePerson } from './SpritePerson';
+import { themeFor } from './themes';
 
 /** the bits of a staff member's movement state that the 3D scene reads every frame */
 export type StaffView = {
@@ -101,20 +102,20 @@ function Staff3D({ m, now }: { m: CrewMember; now: () => number }) {
   return <SpritePerson sheet={STAFF_SHEETS[m.role]} src={SPR.staff[m.role]} cut={BODY} staff look={look} pose={pose} />;
 }
 
-export function World3D({ k, plan, custs, crew, chairTier, ankara, now, paused }: {
-  k: number; plan: Plan; custs: (Cust | null)[]; crew: CrewMember[]; chairTier: number; ankara: boolean; now: () => number; paused: boolean;
+export function World3D({ k, plan, custs, crew, chairTier, ankara, city, now, paused }: {
+  k: number; plan: Plan; custs: (Cust | null)[]; crew: CrewMember[]; chairTier: number; ankara: boolean; city: string; now: () => number; paused: boolean;
 }) {
   const nth: Record<string, number> = {};
   return (
     <GLCanvas width={844 * k} height={CANVAS_H * k} zoom={ZPX * k} paused={paused}>
-      <color attach="background" args={[ankara ? '#2A1A12' : '#3A2418']} />
+      <color attach="background" args={[(ankara ? themeFor(city).up : themeFor(city).base).bg]} />
       <ambientLight intensity={1.9} color="#FFE9CF" />
       <hemisphereLight args={['#FFF1D6', '#9A6A44', 1.3]} />
       <directionalLight position={[-5, 12, 9]} intensity={2.4} color="#FFE3B8" />
       <directionalLight position={[8, 5, -9]} intensity={0.9} color="#FFD6A0" />
       <pointLight position={[-4.9, 3, -0.2]} intensity={14} distance={10} color="#FFB45A" />
       <pointLight position={[4.2, 3, -0.2]} intensity={14} distance={9} color="#FFB45A" />
-      <Room plan={plan} chairTier={chairTier} ankara={ankara} />
+      <Room plan={plan} chairTier={chairTier} ankara={ankara} city={city} />
       {custs.map((c, i) => c && <Customer3D key={c.id} c={c} seat={i} plan={plan} now={now} />)}
       {crew.map((m) => { nth[m.role] = (nth[m.role] ?? -1) + 1; return <Staff3D key={m.id} m={{ ...m, n: nth[m.role] }} now={now} />; })}
     </GLCanvas>

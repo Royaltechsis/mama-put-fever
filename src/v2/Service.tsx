@@ -704,7 +704,7 @@ export default function Service({ levelIdx, save, onEnd, onQuit, onRestart, soun
 
   return (
     <View style={{ flex: 1 }}>
-      <World3D k={S(1)} plan={plan} custs={G.custs} crew={crew3d} chairTier={save.chair ?? 0} ankara={!!save.decor.ankara} now={tn} paused={paused} />
+      <World3D k={S(1)} plan={plan} custs={G.custs} crew={crew3d} chairTier={save.chair ?? 0} ankara={!!save.decor.ankara} city={save.dest} now={tn} paused={paused} />
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: S(CANVAS_H), width: S(SW), height: S(390 - CANVAS_H), overflow: 'hidden' }}>
         <Image source={SPR.bg[save.decor.ankara ? 1 : 0]} style={{ position: 'absolute', left: 0, top: S(-355 * 0.609), width: S(SW), height: S(475) }} resizeMode="stretch" />
       </View>
