@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { ZoomIn, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Abs, GText, GameBtn, Panel, SW, useS } from './stage';
 import { SPR } from './assets';
 import { DECOR, KITCHEN, LEVELS2, goalsFor, type DecorUp, type KitchenUp } from './data2';
 import type { Save2 } from './save2';
 import type { Dest } from './dests';
-
-const NODE = (i: number) => {
-  const row = Math.floor(i / 6);
-  const col = row % 2 === 0 ? i % 6 : 5 - (i % 6);
-  return { x: 300 + col * 88, y: 92 + row * 120 + (col % 2) * 26 };
-};
+import { LevelRoad } from './LevelRoad';
 
 export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuka, onBuyKitchen, onBuyDecor, onToggleSound, onToggleMusic, onReset }: {
   save: Save2; dest: Dest; onPlay: (i: number) => void; onMap: () => void; onMarket: () => void; onBuka: () => void; onBuyKitchen: (k: KitchenUp) => void; onBuyDecor: (d: DecorUp) => void; onToggleSound: () => void; onToggleMusic: () => void; onReset: () => void;
@@ -19,10 +15,25 @@ export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuka, onB
   const S = useS();
   const [shop, setShop] = useState<null | 'kitchen' | 'decor'>(null);
   const totalStars = save.stars.reduce((a, b) => a + (b ?? 0), 0);
+  // a finished last level opens the next one, even if the city got more levels after it was played
+  const lastStarred = save.stars.reduce((m, v, i) => ((v ?? 0) > 0 ? i : m), -1);
+  const unlocked = Math.min(LEVELS2.length - 1, Math.max(save.unlocked, lastStarred + 1));
   return (
     <View style={{ flex: 1 }}>
       <Image source={SPR.bg[save.decor.ankara ? 1 : 0]} style={{ position: 'absolute', width: S(SW), height: S(390) }} resizeMode="cover" />
-      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#1A0E0670' }} />
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#1A0E0640' }} />
+      <LevelRoad key={dest.id} city={dest.id} levels={LEVELS2} stars={save.stars} unlocked={unlocked} onPlay={onPlay} />
+      {/* the left panel fades the road out underneath it */}
+      <Svg pointerEvents="none" width={S(330)} height={S(390)} style={{ position: 'absolute', left: 0, top: 0 }}>
+        <Defs>
+          <LinearGradient id="lp" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#1A0E06" stopOpacity={0.85} />
+            <Stop offset="0.78" stopColor="#1A0E06" stopOpacity={0.6} />
+            <Stop offset="1" stopColor="#1A0E06" stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={S(330)} height={S(390)} fill="url(#lp)" />
+      </Svg>
       {/* left column: title on top, buttons pinned to the bottom, the picture takes whatever room is left (and is
           clipped rather than pushed under the buttons) */}
       <Abs x={14} y={12} w={262} h={370} style={{ flexDirection: 'column' }}>
@@ -35,7 +46,7 @@ export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuka, onB
           <Image source={SPR.food.chicken} style={{ width: S(50), height: S(46) }} resizeMode="contain" />
           <Image source={SPR.props.zobo} style={{ width: S(30), height: S(50) }} resizeMode="contain" />
         </View>
-        <GameBtn label="▶ PLAY" testID="play" w={240} h={54} size={24} onPress={() => onPlay(Math.min(save.unlocked, LEVELS2.length - 1))} />
+        <GameBtn label="▶ PLAY" testID="play" w={240} h={54} size={24} onPress={() => onPlay(unlocked)} />
         <View style={{ flexDirection: 'row', marginTop: S(8) }}>
           <GameBtn label="🗺 Map" testID="to-map" color="purple" w={84} h={42} size={13} onPress={onMap} />
           <View style={{ width: S(8) }} />
@@ -57,24 +68,12 @@ export default function Home2({ save, dest, onPlay, onMap, onMarket, onBuka, onB
           <Text style={{ color: '#FFC93C', fontWeight: '900', fontSize: S(13) }}>₦{save.coins.toLocaleString('en-US')}</Text>
         </View>
       </View>
-      {/* level map */}
-      <Abs x={290} y={48} w={548} h={20}><GText size={14}>{`${dest.name} — ${LEVELS2.length} levels · ⭐ unlock new cities`}</GText></Abs>
-      {LEVELS2.map((lv, i) => {
-        const n = NODE(i);
-        const locked = i > save.unlocked;
-        const st = save.stars[i] ?? 0;
-        return (
-          <Animated.View key={i} entering={ZoomIn.delay(i * 30)} style={{ position: 'absolute', left: S(n.x), top: S(n.y) }}>
-            <Pressable testID={`level-${i + 1}`} disabled={locked} onPress={() => onPlay(i)} style={({ pressed }) => ({ alignItems: 'center', transform: [{ scale: pressed ? 0.92 : 1 }] })}>
-              <View style={{ width: S(56), height: S(56), borderRadius: S(28), backgroundColor: locked ? '#8D7F70' : lv.bulk ? '#7B4BC4' : '#F28C28', borderWidth: S(3), borderColor: '#FFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 3 } }}>
-                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(locked ? 18 : 22) }}>{locked ? '🔒' : i + 1}</Text>
-              </View>
-              <Text style={{ fontSize: S(11), marginTop: S(1) }}>{[0, 1, 2].map((k) => (k < st ? '⭐' : '☆')).join('')}</Text>
-              {lv.bulk && <Text style={{ fontSize: S(9), color: '#FFF', fontWeight: '900', backgroundColor: '#7B4BC4', paddingHorizontal: S(4), borderRadius: S(6), overflow: 'hidden' }}>🎉 Owambe</Text>}
-            </Pressable>
-          </Animated.View>
-        );
-      })}
+      {/* where you are on the road */}
+      <Abs x={300} y={12} w={340} h={30} pointerEvents="none">
+        <View style={{ alignSelf: 'flex-start', backgroundColor: '#2B1B12D9', borderRadius: S(12), paddingHorizontal: S(10), paddingVertical: S(4), borderWidth: S(1.5), borderColor: '#FFC93C' }}>
+          <Text style={{ color: '#FFF', fontWeight: '900', fontSize: S(12) }}>{dest.name} · Level {unlocked + 1} of {LEVELS2.length} · scroll the road ➜</Text>
+        </View>
+      </Abs>
       <Pressable onPress={onReset} style={{ position: 'absolute', right: S(10), bottom: S(6) }}><Text style={{ color: '#FFFFFF88', fontSize: S(10) }}>reset progress</Text></Pressable>
       {shop && <Shop kind={shop} save={save} onClose={() => setShop(null)} onBuyKitchen={onBuyKitchen} onBuyDecor={onBuyDecor} />}
     </View>

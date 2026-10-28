@@ -51,6 +51,44 @@ export const LEVELS2: Level2[] = [
   { name: "Chief's 60th", duration: 130, customers: 12, menu: ['jcd', 'ee', 'suya', 'puff', 'chapman', 'zobo'], maxItems: 3, gap: 7.5, patience: 36, bulk: bulk('Owambe: Jollof for 30', 'jollof', 30, 'cooler', { water: 30 }, 110, 9) },
 ];
 
+export const LEVELS_PER_CITY = 40;
+
+/**
+ * Tops a city's hand-made levels up to LEVELS_PER_CITY. Each new level gets harder (more customers, shorter gaps,
+ * less patience, longer days) and rotates through the city's whole menu; Lagos also gets an Owambe every 4th level.
+ */
+export function growLevels(made: Level2[], menu: Record<MenuId, MenuItem>, names: string[], owambe = false): Level2[] {
+  const out = [...made];
+  const last = made[made.length - 1];
+  const foods = Object.keys(menu).filter((m) => !menu[m].drink);
+  const drinks = Object.keys(menu).filter((m) => menu[m].drink);
+  const start = made.length;
+  const bulkDishes: ['jollof' | 'suya' | 'egusi' | 'dodo', 'pack' | 'foil' | 'cooler'][] = [['jollof', 'pack'], ['suya', 'foil'], ['egusi', 'pack'], ['jollof', 'cooler'], ['dodo', 'pack']];
+  for (let i = start; i < LEVELS_PER_CITY; i++) {
+    const t = (i - start + 1) / (LEVELS_PER_CITY - start);
+    const lerp = (a: number, b: number) => a + (b - a) * t;
+    // a rotating window over the menu that widens as the levels go on
+    const nFood = Math.min(foods.length, Math.round(lerp(3, foods.length + 0.4)));
+    const pick = Array.from({ length: nFood }, (_, k) => foods[(i * 2 + k) % foods.length]);
+    const lv: Level2 = {
+      name: names[(i - start) % names.length],
+      duration: Math.round(lerp(last.duration + 5, 175) / 5) * 5,
+      customers: Math.round(lerp(last.customers + 1, 24)),
+      menu: [...new Set(pick), ...drinks],
+      maxItems: 3,
+      gap: Math.round(lerp(last.gap - 0.2, 5.2) * 10) / 10,
+      patience: Math.round(lerp(last.patience - 1, 29)),
+    };
+    if (owambe && (i + 1) % 4 === 0) {
+      const [dish, box] = bulkDishes[((i + 1) / 4) % bulkDishes.length];
+      const people = Math.round(lerp(20, 60) / 5) * 5;
+      lv.bulk = bulk(`Owambe: ${dish === 'jollof' ? 'Jollof' : dish === 'suya' ? 'Suya' : dish === 'egusi' ? 'Egusi' : 'Dodo'} for ${people}`, dish, people, box, dish === 'jollof' ? { water: people } : {}, Math.round(lerp(100, 150)), 2 + (i % 6));
+    }
+    out.push(lv);
+  }
+  return out;
+}
+
 export function stationsFor(lv: Level2): Set<Station> {
   const s = new Set<Station>();
   lv.menu.forEach((m) => {

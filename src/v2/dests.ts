@@ -1,7 +1,7 @@
 // Destinations (Cooking Fever-style restaurants across Nigeria).
 // The kitchen mechanics are shared; each destination re-skins them with its own dishes, art, customers and levels.
 import { SPR } from './assets';
-import { MENU, LEVELS2, type Level2, type MenuItem } from './data2';
+import { MENU, LEVELS2, growLevels, type Level2, type MenuItem } from './data2';
 
 export type DestId = 'lagos' | 'ibadan' | 'ph' | 'enugu' | 'abuja' | 'kano';
 import type { StockKey } from './save2';
@@ -40,7 +40,20 @@ export const LBL: Labels = { ...LAGOS_LABELS };
 export const STOCK_OF: Record<string, StockKey> = {};
 
 const LAGOS_MENU: Record<string, MenuItem> = { ...MENU };
-const LAGOS_LEVELS: Level2[] = [...LEVELS2];
+// names for the levels after the hand-made ones, in order
+const LAGOS_NAMES = ['Yaba tech week', 'Danfo drivers', 'Rainy season', 'Mainland Owambe', 'Sabo market day', 'Unilag convocation', 'Jollof wars', 'Third Mainland traffic',
+  'Eko Atlantic lunch', 'Detty December', 'Surulere derby', 'Ikeja wedding', 'Balogun shoppers', 'Lekki brunch', 'Fela night', 'Iyana Ipaja rush',
+  'Ajah carnival', 'Victoria Island suits', 'Bar beach Sunday', 'Ikorodu homecoming', 'Oshodi madness', 'Lagos Marathon', 'Owambe of owambes', 'Festac reunion',
+  'Ebute Metta feast', 'Agege bread rush', 'Christmas Eve', 'Mamaput legend'];
+const IBADAN_NAMES = ['Mokola matinee', 'Agodi gardens', 'Bower tower climb', 'Oje market', 'Polytechnic rush', 'Iwo road travellers', 'Sango crossroads', 'Ring road jam',
+  'Cocoa house lunch', 'Oke Ado elders', 'Challenge park', 'Eleyele fishermen', 'Mapo hall wedding', 'Ojoo junction', 'Apata Sunday', 'Liberty stadium',
+  'Akobo estate', 'Molete moonlight', 'Bodija night market', 'Ibadan carnival', 'Oluyole bosses', 'Gate rush hour', 'Amala marathon', 'Egungun festival',
+  'Ogunpa rainstorm', 'Agbowo hostel run', 'Old Oyo road', 'Ojude Oba', 'Arulogun crowd', 'Basorun feast', 'Olubadan coronation', 'Amala royalty'];
+const PH_NAMES = ['Creek road fishers', 'Mile one market', 'Trans Amadi shift', 'Uniport freshers', 'Borokiri breeze', 'Rumuokoro rush', 'Diobu Sunday', 'Choba campus',
+  'Bonny ferry', 'Kalabari wrestling', 'Elelenwo evening', 'Rumuola jam', 'Abonnema boat race', 'Oil boom party', 'Woji estate', 'GRA garden party',
+  'Port fish market', 'Okrika regatta', 'Rivers carnival', 'Eleme refinery lunch', 'Buguma festival', 'Harmattan haze', 'Pepper soup night', 'Ikwerre road rush',
+  'Ogoni harvest', 'Garden City gala', 'Bori camp', 'Amanyanabo feast', 'Waterside wedding', 'Bole king', 'Rivers delight', 'Chief of the creeks'];
+const LAGOS_LEVELS: Level2[] = growLevels([...LEVELS2], MENU, LAGOS_NAMES, true);
 
 const V4 = {
   amala: require('../../assets/v4/amala.webp'), ewedu: require('../../assets/v4/ewedu.webp'), gbegiri: require('../../assets/v4/gbegiri.webp'),
@@ -136,7 +149,11 @@ export const DESTS: Dest[] = [
   { id: 'kano', name: 'Kano', state: 'Kano State', place: 'Sabon Gari Suya Spot', tagline: 'Suya, masa, tuwo & kunu', color: '#C0392B', pin: { x: 650, y: 54 }, starsToUnlock: 38, playable: false, signature: 'Masa & suya' },
 ];
 
-export const destById = (id: string) => DESTS.find((d) => d.id === id) ?? DESTS[0];
+// top Ibadan and Port Harcourt up to the full level count, from their own menus
+const MORE_NAMES: Partial<Record<DestId, string[]>> = { ibadan: IBADAN_NAMES, ph: PH_NAMES };
+DESTS.forEach((d) => { const names = MORE_NAMES[d.id]; if (names && d.levels && d.menu) d.levels = growLevels(d.levels, d.menu, names); });
+
+export const destById =(id: string) => DESTS.find((d) => d.id === id) ?? DESTS[0];
 
 /** Swap the shared kitchen over to a destination: its menu, levels, art, labels, stock mapping. */
 export function activateDest(id: DestId) {
