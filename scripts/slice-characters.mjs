@@ -51,8 +51,11 @@ function keyOut(img) {
     }
   }
   // enclosed gaps (between an arm and the body) are not reached from the edge: drop pixels that are almost exactly the background
-  const gap = pure ? 45 : 26;
+  const gap = pure ? 70 : 26;
   for (let p = 0; p < w * h; p++) if (!isBg[p] && dist(p) < gap) isBg[p] = 1;
+  // grid lines drawn between the poses: a row or column that is solid nearly edge to edge is a line, not a person
+  for (let y = 0; y < h; y++) { let c = 0; for (let x = 0; x < w; x++) c += isBg[y * w + x] ? 0 : 1; if (c > w * 0.97) for (let x = 0; x < w; x++) isBg[y * w + x] = 1; }
+  for (let x = 0; x < w; x++) { let c = 0; for (let y = 0; y < h; y++) c += isBg[y * w + x] ? 0 : 1; if (c > h * 0.97) for (let y = 0; y < h; y++) isBg[y * w + x] = 1; }
   for (let p = 0; p < w * h; p++) {
     if (isBg[p]) { data[p * 4] = 40; data[p * 4 + 1] = 30; data[p * 4 + 2] = 25; data[p * 4 + 3] = 0; continue; }
     // pull the background tint off the outline
@@ -89,23 +92,32 @@ function figuresInRow(isBg, w, y0, y1) {
     // a short gap (a hand or a towel standing off the body) still belongs to the same figure
     if (last && x - last.x1 < w * 0.012) last.x1 = x + 1; else runs.push({ x0: x, x1: x + 1 });
   }
-  return runs.filter((r) => r.x1 - r.x0 > w * 0.02).map((r) => ({ x0: r.x0, x1: r.x1, y0, y1 }));
+  const boxes = runs.filter((r) => r.x1 - r.x0 > w * 0.02).map((r) => ({ x0: r.x0, x1: r.x1, y0, y1 }));
+  // a bag or stick standing on its own between poses is much shorter than a person: drop it
+  const tall = boxes.map((b) => { const f = figure(isBg, w, b); return f ? f.maxY - f.minY : 0; });
+  const most = Math.max(0, ...tall);
+  return boxes.filter((_, i) => tall[i] > most * 0.55);
 }
 
 /**
- * The 8 frame cells. The prompt asks for 4 per row, but image models often draw more walking poses on top and fewer
- * on the bottom, so the figures are found rather than assumed: the top row is the walk cycle (sampled to 4 frames),
- * the bottom row fills the remaining 4 slots in order.
+ * The 8 frame cells. The prompt asks for 4 per row, but image models often draw more walking poses on top and a
+ * different number on the bottom, so the figures are found rather than assumed: the top row is the walk cycle
+ * (sampled to 4 frames). For staff the bottom row fills the last 4 slots in order. For customers with more than 4
+ * bottom poses: the first is standing, the second sitting, the last chewing, and the eating pose is the middle one
+ * between sitting and chewing.
  */
-function cells(isBg, w, h) {
+function cells(isBg, w, h, staff) {
   const rowCount = new Array(h).fill(0);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (!isBg[y * w + x]) rowCount[y]++;
   const mid = gapIn(rowCount, Math.round(h * 0.35), Math.round(h * 0.65));
   const top = figuresInRow(isBg, w, 0, mid);
   const bottom = figuresInRow(isBg, w, mid, h);
   const walk = top.length ? [0, 1, 2, 3].map((i) => top[Math.floor((i * top.length) / 4)]) : [null, null, null, null];
-  // more than 4 on the bottom (an extra eating pose): keep stand, sit, the first eat and the last one (chewing)
-  const rest = bottom.length > 4 ? [bottom[0], bottom[1], bottom[2], bottom[bottom.length - 1]] : [0, 1, 2, 3].map((i) => bottom[i] ?? null);
+  let rest = [0, 1, 2, 3].map((i) => bottom[i] ?? null);
+  if (!staff && bottom.length > 4) {
+    const last = bottom.length - 1;
+    rest = [bottom[0], bottom[1], bottom[1 + Math.ceil((last - 2) / 2)], bottom[last]];
+  }
   return { boxes: [...walk, ...rest], found: `${top.length} top, ${bottom.length} bottom` };
 }
 
@@ -130,7 +142,7 @@ async function slice(file) {
   if (img.bitmap.width > 2400) img.resize(2400, Jimp.AUTO);
   const { width: w, height: h } = img.bitmap;
   const isBg = keyOut(img);
-  const { boxes, found } = cells(isBg, w, h);
+  const { boxes, found } = cells(isBg, w, h, STAFF.includes(id));
   const figs = boxes.map((c) => (c ? figure(isBg, w, c) : null));
   const walkH = figs.slice(0, 4).filter(Boolean).map((f) => f.maxY - f.minY).sort((a, b) => a - b);
   if (walkH.length < 2) throw new Error(`${file}: could not find the walking frames on the top row`);

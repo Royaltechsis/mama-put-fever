@@ -19,7 +19,7 @@ import Prep, { type PrepResult } from './src/v2/Prep';
 import MyBuka from './src/v2/MyBuka';
 import DaySummary from './src/v2/DaySummary';
 import { wagesOf } from './src/v2/save2';
-import AccountPanel from './src/v2/Account';
+import AccountPanel from './src/v2/AccountPanel';
 import { setupPwa } from './src/v2/pwa';
 setupPwa();
 import { accountsAvailable, me, putSave, type User } from './src/v2/account';

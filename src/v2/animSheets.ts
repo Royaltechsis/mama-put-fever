@@ -20,6 +20,8 @@ export const CUST_SHEETS = new Map<unknown, number>([
   [require('../../assets/v4/cp1.webp'), require('../../assets/anim/cp1.png')],
   [require('../../assets/v4/cp2.webp'), require('../../assets/anim/cp2.png')],
   [require('../../assets/v4/cp3.webp'), require('../../assets/anim/cp3.png')],
+  [require('../../assets/v4/cp4.webp'), require('../../assets/anim/cp4.png')],
+  [require('../../assets/v4/cp5.webp'), require('../../assets/anim/cp5.png')],
 ]);
 export const STAFF_SHEETS: Partial<Record<StaffId, number>> = {
   cleaner: require('../../assets/anim/cleaner.png'),
