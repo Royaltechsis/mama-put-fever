@@ -146,7 +146,7 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar hidden />
-        <Stage>
+        <Stage fullscreen={ph.p === 'prep' || ph.p === 'service' || ph.p === 'event'}>
           <DragProvider>
             {screen}
             {acctOpen && save && <AccountPanel save={save} user={user} onClose={() => setAcctOpen(false)} onUser={setUser} onLoadSave={(s) => { activateDest((s.dest as DestId) || 'lagos'); persist(s); }} />}

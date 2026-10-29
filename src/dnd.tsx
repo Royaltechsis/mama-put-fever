@@ -3,6 +3,7 @@ import { StyleSheet, View, type ViewStyle, type StyleProp } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { haptic } from './fx';
+import { useK, useS } from './v2/stage';
 
 export type Payload =
   | { kind: 'ing'; id: string }
@@ -46,6 +47,7 @@ export const useDrag = () => {
 const GHOST = 76;
 
 export function DragProvider({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const k = useK();
   const zones = useRef(new Map<string, Zone>());
   const rootRef = useRef<ViewRef>(null);
   const root = useRef({ x: 0, y: 0 });
@@ -79,9 +81,10 @@ export function DragProvider({ children, style }: { children: React.ReactNode; s
   const hit = useCallback((x: number, y: number): string | null => {
     const p = payloadRef.current;
     if (!p) return null;
+    // slop and snap are in stage units (times k), so the forgiving area grows with the screen
     let best: string | null = null;
     let bestArea = Infinity;
-    const slop = 14;
+    const slop = 16 * k;
     zones.current.forEach((z, id) => {
       const r = z.rect;
       if (!r || !z.accepts(p)) return;
@@ -93,8 +96,22 @@ export function DragProvider({ children, style }: { children: React.ReactNode; s
         }
       }
     });
-    return best;
-  }, []);
+    if (best) return best;
+    // finger landed just off a target: snap to the nearest one that accepts this payload
+    const snap = 36 * k;
+    let near: string | null = null;
+    let nearD = snap;
+    zones.current.forEach((z, id) => {
+      const r = z.rect;
+      if (!r || !z.accepts(p)) return;
+      const d = Math.hypot(Math.max(r.x - x, 0, x - (r.x + r.w)), Math.max(r.y - y, 0, y - (r.y + r.h)));
+      if (d < nearD) {
+        nearD = d;
+        near = id;
+      }
+    });
+    return near;
+  }, [k]);
 
   const start = useCallback((p: Payload, g: React.ReactNode, x: number, y: number) => {
     payloadRef.current = p;
@@ -164,7 +181,8 @@ export function DragProvider({ children, style }: { children: React.ReactNode; s
   );
 }
 
-export function Draggable({ payload, ghost, children, enabled = true, style, testID, onTap }: {
+/** `reach` (stage units) adds invisible padding around the grab area: a bigger finger target, same picture. Pair it with an Abs `reach` so the layout doesn't move. */
+export function Draggable({ payload, ghost, children, enabled = true, style, testID, onTap, reach = 0 }: {
   payload: Payload;
   ghost?: React.ReactNode;
   children: React.ReactNode;
@@ -172,8 +190,10 @@ export function Draggable({ payload, ghost, children, enabled = true, style, tes
   style?: StyleProp<ViewStyle>;
   testID?: string;
   onTap?: () => void;
+  reach?: number;
 }) {
   const ctx = useDrag();
+  const S = useS();
   const ref = useRef<ViewRef>(null);
   const calib = useRef({ dx: 0, dy: 0 });
   const latest = useRef({ payload, ghost, children, ctx, onTap, enabled });
@@ -226,7 +246,7 @@ export function Draggable({ payload, ghost, children, enabled = true, style, tes
 
   return (
     <GestureDetector gesture={pan}>
-      <View ref={ref} collapsable={false} style={[style, isDragging && { opacity: 0.45 }]} testID={testID}>
+      <View ref={ref} collapsable={false} style={[style, reach > 0 && { padding: S(reach) }, isDragging && { opacity: 0.45 }]} testID={testID}>
         {children}
       </View>
     </GestureDetector>

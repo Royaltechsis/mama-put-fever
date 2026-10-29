@@ -897,9 +897,11 @@ function Source({ id, x, y, w, sprite, emoji, label, tray, onTap, count }: { id:
   const art = sprite
     ? <Image source={sprite} style={{ width: S(w), height: S(w * 0.9) }} resizeMode="contain" />
     : <View style={{ width: S(w * 0.86), height: S(w * 0.8), borderRadius: S(w * 0.4), backgroundColor: '#FFF6E4', borderWidth: S(1.5), borderColor: '#B9824C', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: S(w * 0.48) }}>{emoji}</Text></View>;
+  // reach: a little extra finger area around each ingredient; the art and the layout stay where they were
+  const R = 2;
   return (
-    <Abs x={x} y={y} w={w} h={w + 6}>
-      <Draggable payload={{ kind: 'src', id }} onTap={onTap} ghost={sprite ? <Image source={sprite} style={{ width: S(56), height: S(56) }} resizeMode="contain" /> : <Text style={{ fontSize: S(40) }}>{emoji}</Text>} testID={`src-${id}`} style={{ flex: 1, alignItems: 'center' }}>
+    <Abs x={x} y={y} w={w} h={w + 6} reach={R}>
+      <Draggable payload={{ kind: 'src', id }} onTap={onTap} reach={R} ghost={sprite ? <Image source={sprite} style={{ width: S(56), height: S(56) }} resizeMode="contain" /> : <Text style={{ fontSize: S(40) }}>{emoji}</Text>} testID={`src-${id}`} style={{ flex: 1, alignItems: 'center' }}>
         {tray && <Image source={SPR.appl.tray} style={{ position: 'absolute', top: S(w * 0.35), width: S(w + 4), height: S(w * 0.6) }} resizeMode="stretch" />}
         {art}
         <View style={{ backgroundColor: '#2B1B12B0', borderRadius: S(6), paddingHorizontal: S(3), marginTop: S(-6) }}>

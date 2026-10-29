@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions, Pressable, type StyleProp, type ViewStyle, type TextStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { FullscreenControl } from './Fullscreen';
 
 export const SW = 844;
 export const SH = 390;
@@ -18,14 +19,17 @@ export function Scaled({ f, children }: { f: number; children: React.ReactNode }
 }
 
 /** Fixed 844x390 logical stage, scaled to fit the screen (letterboxed). Children use S(n) for sizes. */
-export function Stage({ children }: { children: React.ReactNode }) {
+export function Stage({ children, fullscreen = false }: { children: React.ReactNode; fullscreen?: boolean }) {
   const { width, height } = useWindowDimensions();
   const k = Math.min(width / SW, height / SH);
   if (width < MIN_PLAY_WIDTH) return <RotateHint />;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1E120A' }}>
       <KCtx.Provider value={k}>
-        <View style={{ width: SW * k, height: SH * k, overflow: 'hidden' }}>{children}</View>
+        <View style={{ width: SW * k, height: SH * k, overflow: 'hidden' }}>
+          {children}
+          {fullscreen && <FullscreenControl k={k} />}
+        </View>
       </KCtx.Provider>
     </View>
   );
@@ -46,11 +50,11 @@ export function useS() {
   return (n: number) => n * k;
 }
 
-/** absolute box in stage units */
-export function Abs({ x, y, w, h, children, style, pointerEvents }: { x: number; y: number; w?: number; h?: number; children?: React.ReactNode; style?: StyleProp<ViewStyle>; pointerEvents?: 'none' | 'box-none' | 'auto' }) {
+/** absolute box in stage units. `reach` grows the box by that much on every side (pair with Draggable `reach`) */
+export function Abs({ x, y, w, h, children, style, pointerEvents, reach = 0 }: { x: number; y: number; w?: number; h?: number; children?: React.ReactNode; style?: StyleProp<ViewStyle>; pointerEvents?: 'none' | 'box-none' | 'auto'; reach?: number }) {
   const S = useS();
   return (
-    <View pointerEvents={pointerEvents} style={[{ position: 'absolute', left: S(x), top: S(y), width: w != null ? S(w) : undefined, height: h != null ? S(h) : undefined }, style]}>
+    <View pointerEvents={pointerEvents} style={[{ position: 'absolute', left: S(x - reach), top: S(y - reach), width: w != null ? S(w + reach * 2) : undefined, height: h != null ? S(h + reach * 2) : undefined }, style]}>
       {children}
     </View>
   );
